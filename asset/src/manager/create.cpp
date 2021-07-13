@@ -1,13 +1,13 @@
 #include "asset/asset-cam.h"
 #include "asset/asset-configure-inform.h"
+#include "asset/asset-helpers.h"
 #include "asset/asset-import.h"
 #include "asset/asset-manager.h"
-#include "asset/asset-helpers.h"
 #include "asset/csv.h"
-#include <fty_asset_dto.h>
 #include <cxxtools/jsondeserializer.h>
-#include <mutex>
+#include <fty_asset_dto.h>
 #include <fty_log.h>
+#include <mutex>
 
 namespace fty::asset {
 
@@ -31,7 +31,27 @@ AssetExpected<uint32_t> AssetManager::createAsset(const std::string& json, const
         logError(e.what());
         return unexpected(msg.format("", e.what()));
     }
+    auto ret = importAsset(si, user, sendNotify, msg);
+    if (!ret) {
+        return unexpected(ret.error());
+    }
+    return ret.value();
+}
 
+AssetExpected<uint32_t> AssetManager::createAsset(
+    const cxxtools::SerializationInfo& serializationInfo, const std::string& user, bool sendNotify)
+{
+    auto msg = "Request CREATE asset {} FAILED: {}"_tr;
+    auto ret = importAsset(serializationInfo, user, sendNotify, msg);
+    if (!ret) {
+        return unexpected(ret.error());
+    }
+    return ret.value();
+}
+
+AssetExpected<uint32_t> AssetManager::importAsset(
+    const cxxtools::SerializationInfo& si, const std::string& user, bool sendNotify, fty::Translate& msg)
+{
     std::string itemName;
     si.getMember("name", itemName);
 

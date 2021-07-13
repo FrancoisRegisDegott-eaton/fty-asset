@@ -1,5 +1,6 @@
 #include "asset/asset-manager.h"
 #include <catch2/catch.hpp>
+#include <cxxtools/jsondeserializer.h>
 #include <fty_common_db_connection.h>
 #include <test-db/sample-db.h>
 
@@ -110,4 +111,49 @@ TEST_CASE("Feed in same DC")
         REQUIRE(!ret);
         CHECK(ret.error().message() == "Request CREATE asset dev2 FAILED: Power source is not in same DC");
     }
+}
+
+TEST_CASE("Create asset with SerializationInfo")
+{
+    fty::SampleDb db(R"(
+        items:
+            - type     : Datacenter
+              name     : datacenter
+              ext-name : Data Center
+        )");
+
+    static std::string json = R"({
+        "location" :            "Data center",
+        "name" :                "dev1",
+        "powers":               [],
+        "priority" :            "P2",
+        "status" :              "active",
+        "sub_type" :            "N_A",
+        "type" :                "room",
+        "ext": [
+            {"asset_tag": "", "read_only": false},
+            {"contact_name": "", "read_only": false},
+            {"contact_email": "", "read_only": false},
+            {"contact_phone": "", "read_only": false},
+            {"description": "", "read_only": false},
+            {"create_mode": "", "read_only": false},
+            {"update_ts": "", "read_only": false}
+        ]
+    })";
+
+    cxxtools::SerializationInfo si;
+    std::stringstream           jsonIn;
+    try {
+        jsonIn << json;
+        cxxtools::JsonDeserializer deserializer(jsonIn);
+        deserializer.deserialize(si);
+    } catch (const std::exception& e) {
+        REQUIRE(false);
+    }
+
+    auto ret = fty::asset::AssetManager::createAsset(si, "dummy", false);
+    REQUIRE_EXP(ret);
+    CHECK(*ret > 0);
+
+    CHECK(fty::asset::AssetManager::deleteAsset(*ret, false));
 }

@@ -32,6 +32,9 @@ public:
     static AssetExpected<uint32_t> createAsset(
         const std::string& json, const std::string& user, bool sendNotify = true);
 
+    static AssetExpected<uint32_t> createAsset(
+        const cxxtools::SerializationInfo& serializationInfo, const std::string& user, bool sendNotify = true);
+
     static AssetExpected<ImportList> importCsv(const std::string& csv, const std::string& user, bool sendNotify = true);
     static AssetExpected<std::string> exportCsv(const std::optional<db::AssetElement>& dc = std::nullopt);
 
@@ -39,6 +42,8 @@ private:
     static AssetExpected<db::AssetElement> deleteDcRoomRowRack(const db::AssetElement& element);
     static AssetExpected<db::AssetElement> deleteGroup(const db::AssetElement& element);
     static AssetExpected<db::AssetElement> deleteDevice(const db::AssetElement& element);
+    static AssetExpected<uint32_t> importAsset(
+        const cxxtools::SerializationInfo& si, const std::string& user, bool sendNotify, fty::Translate& msg);
 };
 
 } // namespace fty::asset
