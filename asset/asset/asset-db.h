@@ -264,7 +264,15 @@ Expected<std::vector<DbAssetLink>> selectAssetDeviceLinksTo(uint32_t elementId, 
 /// @param typeId type id
 /// @param subtypeId subtype id
 /// @return map of devices or error
-Expected<std::map<uint32_t, std::string>> selectShortElements(uint16_t typeId, uint16_t subtypeId); //! test
+Expected<std::vector<std::pair<uint32_t, std::string>>> selectShortElements(
+    uint16_t typeId, uint16_t subtypeId, const std::string& order = {}, const std::string& orderDir = {}); //! test
+
+/// Selects all devices of certain type/subtype
+/// @param typeId type id
+/// @param subtypeId subtype id
+/// @return map of devices or error
+Expected<std::vector<std::pair<uint32_t, std::string>>> selectShortElements(
+    uint16_t typeId, const std::vector<uint16_t>& subtypeId, const std::string& order = {}, const std::string& orderDir = {}); //! test
 
 /// Returns how many times is gived a couple keytag/value in t_bios_asset_ext_attributes
 /// @param keytag keytag

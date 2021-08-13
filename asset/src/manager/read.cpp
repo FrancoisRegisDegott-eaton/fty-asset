@@ -51,24 +51,33 @@ static std::vector<std::tuple<uint32_t, std::string, std::string, std::string>> 
     return ret;
 }
 
-AssetExpected<AssetManager::AssetList> AssetManager::getItems(const std::string& typeName, const std::string& subtypeName)
+AssetExpected<AssetManager::AssetList> AssetManager::getItems(const std::string& typeName,
+    const std::string& subtypeName, const std::string& order, OrderDir orderDir)
 {
-    uint16_t subtypeId = 0;
+    return getItems(typeName, std::vector<std::string>{subtypeName}, order, orderDir);
+}
 
+AssetExpected<AssetManager::AssetList> AssetManager::getItems(const std::string& typeName, const std::vector<std::string>& subtypeName,
+    const std::string& order, OrderDir orderDir)
+{
     uint16_t typeId = persist::type_to_typeid(typeName);
     if (typeId == persist::asset_type::TUNKNOWN) {
         return unexpected("Expected datacenters,rooms,ros,racks,devices"_tr);
     }
 
-    if (typeName == "device" && !subtypeName.empty()) {
-        subtypeId = persist::subtype_to_subtypeid(subtypeName);
-        if (subtypeId == persist::asset_subtype::SUNKNOWN) {
-            return unexpected("Expected ups, epdu, pdu, genset, sts, server, feed"_tr);
+    std::vector<uint16_t> subtypeIds;
+    if (typeName == "device") {
+        for(const auto& name: subtypeName) {
+            auto id = persist::subtype_to_subtypeid(name);
+            if (id == persist::asset_subtype::SUNKNOWN) {
+                return unexpected("Expected ups, epdu, pdu, genset, sts, server, feed"_tr);
+            }
+            subtypeIds.emplace_back(id);
         }
     }
 
     try {
-        auto els = db::selectShortElements(typeId, subtypeId);
+        auto els = db::selectShortElements(typeId, subtypeIds, order, orderDir == OrderDir::Asc ? "ASC" : "DEST");
         if (!els) {
             return unexpected(els.error());
         }
@@ -77,6 +86,7 @@ AssetExpected<AssetManager::AssetList> AssetManager::getItems(const std::string&
         return unexpected(e.what());
     }
 }
+
 
 AssetExpected<db::WebAssetElementExt> AssetManager::getItem(uint32_t id)
 {

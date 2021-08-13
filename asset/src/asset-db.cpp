@@ -315,7 +315,7 @@ Expected<WebAssetElement> selectAssetElementWebByName(const std::string& name)
 
 Expected<std::vector<WebAssetElement>> selectAssetElementsByType(uint16_t type_id, const std::string& status)
 {
-    std::vector<WebAssetElement>           items;
+    std::vector<WebAssetElement> items;
 
     static const std::string sql = webAssetSql() + R"(
         WHERE
@@ -1166,33 +1166,60 @@ Expected<std::vector<DbAssetLink>> selectAssetDeviceLinksTo(uint32_t elementId, 
 
 // =====================================================================================================================
 
-Expected<std::map<uint32_t, std::string>> selectShortElements(uint16_t typeId, uint16_t subtypeId)
+Expected<std::vector<std::pair<uint32_t, std::string>>> selectShortElements(
+    uint16_t typeId, uint16_t subtypeId, const std::string& order, const std::string& orderDir)
 {
-    std::string sql = R"(
-        SELECT
-            v.name, v.id
-        FROM
-            v_bios_asset_element v
-        WHERE
-            v.id_type = :typeid
-    )";
+    return selectShortElements(typeId, std::vector<uint16_t>{subtypeId}, order, orderDir);
+}
 
-    if (subtypeId) {
-        sql += "AND v.id_subtype = :subtypeid";
+Expected<std::vector<std::pair<uint32_t, std::string>>> selectShortElements(
+    uint16_t typeId, const std::vector<uint16_t>& subtypeId, const std::string& order, const std::string& orderDir)
+{
+    std::string sql;
+
+    if (order.empty()) {
+        sql = R"(
+            SELECT
+                v.name, v.id
+            FROM
+                v_bios_asset_element v
+            WHERE
+                v.id_type = :typeid
+        )";
+        if (!subtypeId.empty()) {
+            sql += "AND v.id_subtype in (:subtypeid)";
+        }
+    } else {
+        sql = fmt::format(R"(
+            SELECT
+                v.name, v.id, a.value
+            FROM
+                v_bios_asset_element v
+            LEFT JOIN t_bios_asset_ext_attributes a
+                ON v.id = id_asset_element AND keytag = '{}'
+            WHERE
+                v.id_type = :typeid
+                {}
+            ORDER BY {} {}
+        )",
+           order,
+           !subtypeId.empty() ? "AND v.id_subtype in (:subtypeid)" : "",
+           orderDir.empty() || orderDir == "ASC" ? "COALESCE (a.value, 'ZZZZZZ999999')" : "",
+           !orderDir.empty() ? orderDir : "ASC");
     }
 
     try {
         fty::db::Connection conn;
         auto                st = conn.prepare(sql);
         st.bind("typeid"_p = typeId);
-        if (subtypeId) {
-            st.bind("subtypeid"_p = subtypeId);
+        if (!subtypeId.empty()) {
+            st.bind("subtypeid"_p = implode(subtypeId, ", "));
         }
 
-        std::map<uint32_t, std::string> item;
+        std::vector<std::pair<uint32_t, std::string>> item;
 
         for (auto const& row : st.select()) {
-            item.emplace(row.get<uint32_t>("id"), row.get("name"));
+            item.emplace_back(row.get<uint32_t>("id"), row.get("name"));
         }
 
         return std::move(item);
@@ -1200,6 +1227,7 @@ Expected<std::map<uint32_t, std::string>> selectShortElements(uint16_t typeId, u
         return unexpected(error(Errors::ExceptionForElement).format(e.what(), typeId));
     }
 }
+
 
 // =====================================================================================================================
 
