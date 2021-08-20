@@ -1,4 +1,5 @@
 #include "asset/asset-db.h"
+#include "asset/asset-db2.h"
 #include <catch2/catch.hpp>
 #include <fty_common_asset_types.h>
 #include <fty_common_db_connection.h>
@@ -166,4 +167,5 @@ TEST_CASE("Select asset")
         }
         REQUIRE(*res > 0);
     }
+
 }
