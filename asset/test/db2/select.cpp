@@ -468,14 +468,9 @@ static void testItemsWithoutContainer(fty::db::Connection& conn)
         items.clear();
         auto ret = asset::select::itemsWithoutContainer(conn, func);
         EXP_CHECK(ret);
-        REQUIRE(items.size() == 1);
-        CHECK(items.at(0).name == "UpsWoDC");
-    }
-    {
-        items.clear();
-        auto ret = asset::select::itemsWithoutContainer(conn, func);
-        EXP_CHECK(ret);
-        REQUIRE(items.size() == 0);
+        REQUIRE(items.size() == 2);
+        CHECK(items.at(0).name == "datacenter");
+        CHECK(items.at(1).name == "UpsWoDC");
     }
     {
         items.clear();
@@ -523,8 +518,22 @@ static void testItemsWithoutContainer(fty::db::Connection& conn)
 
         auto ret = asset::select::itemsWithoutContainer(conn, func, {}, order);
         EXP_CHECK(ret);
-        REQUIRE(items.size() == 1);
+        REQUIRE(items.size() == 2);
+        CHECK(items.at(0).name == "datacenter");
+        CHECK(items.at(1).name == "UpsWoDC");
+    }
+    {
+        items.clear();
+
+        asset::select::Order order;
+        order.field = "name";
+        order.dir = asset::select::Order::Dir::Desc;
+
+        auto ret = asset::select::itemsWithoutContainer(conn, func, {}, order);
+        EXP_CHECK(ret);
+        REQUIRE(items.size() == 2);
         CHECK(items.at(0).name == "UpsWoDC");
+        CHECK(items.at(1).name == "datacenter");
     }
 }
 
