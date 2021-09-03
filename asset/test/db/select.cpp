@@ -156,7 +156,7 @@ TEST_CASE("Select asset")
             FAIL(res.error());
         }
         CHECK(res);
-        CHECK(res > 0);
+        CHECK(*res > 0);
     }
 
     {
