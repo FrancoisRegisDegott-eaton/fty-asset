@@ -106,7 +106,7 @@ namespace fty
             /// direct parent iname
             std::string parent_id_;
             /// priority 1..5 (1 is most, 5 is least)
-            uint8_t priority_;
+            uint8_t priority_ = 0;
         public:
             // ctors, dtors, =
             explicit ExtendedAsset (const std::string & id, const std::string & status, const std::string & type, const std::string & subtype,

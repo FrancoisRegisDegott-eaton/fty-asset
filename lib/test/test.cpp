@@ -69,3 +69,13 @@ TEST_CASE("Equality check - bad case")
     
 }
 
+TEST_CASE("Priority set")
+{
+    FullAsset asset;
+    CHECK_NOTHROW(asset.setPriority(1));
+    CHECK(asset.getPriority() == 1);
+    CHECK_NOTHROW(asset.setPriority("1"));
+    CHECK(asset.getPriority() == 1);
+    CHECK_NOTHROW(asset.setPriority("P1"));
+    CHECK(asset.getPriority() == 1);
+}
