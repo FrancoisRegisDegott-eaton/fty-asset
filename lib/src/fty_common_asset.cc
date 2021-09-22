@@ -376,7 +376,11 @@ namespace fty {
 
     void ExtendedAsset::setPriority (const std::string & priority)
     {
-        priority_ = fty::convert<uint8_t>(priority);
+        if (priority.find("P") == 0) {
+            priority_ = fty::convert<uint8_t>(priority.substr(1));
+        } else {
+            priority_ = fty::convert<uint8_t>(priority);
+        }
     }
 
     FullAsset::FullAsset()
