@@ -130,140 +130,6 @@ private:
         return {};
     }
 
-    void createHeader(LineCsvSerializer& lcs)
-    {
-        // names from asset element table itself
-        for (const auto& key : m_assetElementKeytags) {
-            if (key == "id") {
-                continue; // ugly but works
-            }
-            lcs.add(key);
-        }
-
-        // print power links
-        for (uint32_t i = 0; i != m_maxPowerLinks; ++i) {
-            lcs.add("power_source.{}"_format(i + 1));
-            lcs.add("power_plug_src.{}"_format(i + 1));
-            lcs.add("power_input.{}"_format(i + 1));
-        }
-
-        // print extended attributes
-        for (const auto& k : m_keytags) {
-            lcs.add(k);
-        }
-
-        // print groups
-        for (uint32_t i = 0; i != m_maxGroups; ++i) {
-            lcs.add("group.{}"_format(i + 1));
-        }
-
-        lcs.add("id");
-        lcs.serialize();
-    }
-
-    AssetExpected<void> updateKeytags(std::vector<std::string>& keyTags)
-    {
-        if (auto ret = db::selectExtRwAttributesKeytags()) {
-            for (const auto& tag : *ret) {
-                auto found = std::find(m_assetElementKeytags.cbegin(), m_assetElementKeytags.cend(), tag);
-                if (found != m_assetElementKeytags.end()) {
-                    return {};
-                }
-
-                if (std::find(keyTags.cbegin(), keyTags.cend(), tag) == keyTags.end()) {
-                    keyTags.push_back(tag);
-                }
-            }
-            return {};
-        } else {
-            return unexpected(ret.error());
-        }
-    }
-
-    void createTree(Element& parentNode, uint32_t parent)
-    {
-        for (auto it = m_elements.begin(); it != m_elements.end(); ++it) {
-            auto found = std::find_if(it, m_elements.end(), [&](const auto& el) {
-                return el.parentId == parent;
-            });
-
-            if (found != m_elements.end()) {
-                Element ins(*found);
-                createTree(ins, found->id);
-                parentNode.children.push_back(std::move(ins));
-                it = found;
-            }
-        }
-    }
-
-    Expected<Element*> findElement(uint32_t id, Element* parent = nullptr)
-    {
-        Element& el = parent ? *parent : m_root;
-        if (el.element && el.element->id == id) {
-            return &el;
-        }
-        for(auto& ch: el.children) {
-            if (auto ret = findElement(id, &ch)) {
-                return *ret;
-            }
-        }
-        return unexpected("not found");
-    }
-
-    void collectLinks(Element& el)
-    {
-        if (el.element) {
-            auto powerLinks = db::selectAssetDeviceLinksTo(el.element->id, INPUT_POWER_CHAIN);
-            if (powerLinks) {
-                for (const auto& lnk : *powerLinks) {
-                    auto found = findElement(lnk.srcId);
-                    if (found) {
-                        el.links.push_back(*found);
-                    }
-                }
-            }
-        }
-
-        for (auto& it : el.children) {
-            collectLinks(it);
-        }
-    }
-
-    AssetExpected<void> fetchElements(const std::optional<uint32_t>& dc)
-    {
-        auto res = db::selectAssetElementAll(dc);
-        if (!res) {
-            return unexpected(res.error());
-        }
-
-        m_elements = *res;
-        createTree(m_root, 0);
-        collectLinks(m_root);
-
-        // sort;
-        return {};
-    }
-
-    AssetExpected<void> fetchAttributes(const db::WebAssetElement& el, db::Attributes& extAttrs)
-    {
-        auto extAttrsRet = db::selectExtAttributes(el.id);
-        if (!extAttrsRet) {
-            return unexpected(extAttrsRet.error());
-        }
-        extAttrs = *extAttrsRet;
-
-        auto it = extAttrs.find("logical_asset");
-        if (it != extAttrs.end()) {
-            auto extname = db::nameToExtName(it->second.value);
-            if (!extname) {
-                return unexpected(extname.error());
-            }
-            extAttrs["logical_asset"] = {*extname, it->second.readOnly};
-        }
-
-        return {};
-    }
-
     AssetExpected<void> exportRow(const db::WebAssetElement& el, LineCsvSerializer& lcs)
     {
         db::Attributes extAttrs;
@@ -328,11 +194,25 @@ private:
 
         // read-write (!read_only) extended attributes
         for (const auto& k : m_keytags) {
-            if (extAttrs.count(k) == 1 && !extAttrs[k].readOnly) {
-                lcs.add(extAttrs[k].value);
-            } else {
-                lcs.add("");
+            std::string value; //empty
+
+            if (extAttrs.count(k) == 1) {
+                // exception: force export (RW) for some RO extended attr.
+                if (extAttrs[k].readOnly) {
+                    const std::vector<std::string> aux{{
+                        "manufacturer", "serial_no", "model", "contact_name", "http_link.1"
+                    }};
+                    if (std::find(aux.cbegin(), aux.cend(), k) != aux.end()) {
+                        extAttrs[k].readOnly = false;
+                    }
+                }
+
+                if (!extAttrs[k].readOnly) {
+                    value = extAttrs[k].value;
+                }
             }
+
+            lcs.add(value);
         }
 
         // groups
@@ -358,13 +238,149 @@ private:
         return {};
     }
 
+    void createHeader(LineCsvSerializer& lcs)
+    {
+        // names from asset element table itself
+        for (const auto& key : m_assetElementKeytags) {
+            if (key == "id") {
+                continue; // ugly but works
+            }
+            lcs.add(key);
+        }
+
+        // print power links
+        for (uint32_t i = 0; i != m_maxPowerLinks; ++i) {
+            lcs.add("power_source.{}"_format(i + 1));
+            lcs.add("power_plug_src.{}"_format(i + 1));
+            lcs.add("power_input.{}"_format(i + 1));
+        }
+
+        // print extended attributes
+        for (const auto& k : m_keytags) {
+            lcs.add(k);
+        }
+
+        // print groups
+        for (uint32_t i = 0; i != m_maxGroups; ++i) {
+            lcs.add("group.{}"_format(i + 1));
+        }
+
+        lcs.add("id");
+        lcs.serialize();
+    }
+
+    AssetExpected<void> updateKeytags(std::vector<std::string>& keyTags)
+    {
+        if (auto ret = db::selectExtRwAttributesKeytags()) {
+            for (const auto& tag : *ret) {
+                auto pos = std::find(m_assetElementKeytags.cbegin(), m_assetElementKeytags.cend(), tag);
+                if (pos != m_assetElementKeytags.end()) {
+                    return {};
+                }
+
+                if (std::find(keyTags.cbegin(), keyTags.cend(), tag) == keyTags.end()) {
+                    keyTags.push_back(tag);
+                }
+            }
+            return {};
+        } else {
+            return unexpected(ret.error());
+        }
+    }
+
+    void createTree(Element& parentNode, uint32_t parent)
+    {
+        for (auto it = m_elements.begin(); it != m_elements.end(); ++it) {
+            auto found = std::find_if(it, m_elements.end(), [&](const auto& el) {
+                return el.parentId == parent;
+            });
+
+            if (found != m_elements.end()) {
+                Element ins(*found);
+                createTree(ins, found->id);
+                parentNode.children.push_back(std::move(ins));
+                it = found;
+            }
+        }
+    }
+
+    Expected<Element*> findElement(uint32_t id, Element* parent = nullptr)
+    {
+        Element& el = parent ? *parent : m_root;
+        if (el.element && el.element->id == id) {
+            return &el;
+        }
+        for(auto& ch: el.children) {
+            if (auto ret = findElement(id, &ch)) {
+                return *ret;
+            }
+        }
+        return unexpected("not found");
+    }
+
+    void collectLinks(Element& el)
+    {
+        if (el.element) {
+            auto powerLinks = db::selectAssetDeviceLinksTo(el.element->id, INPUT_POWER_CHAIN);
+            if (powerLinks) {
+                for (const auto& lnk : *powerLinks) {
+                    auto found = findElement(lnk.srcId);
+                    if (found) {
+                        el.links.push_back(*found);
+                    }
+                }
+            }
+        }
+
+        for (auto& it : el.children) {
+            collectLinks(it);
+        }
+    }
+
+    AssetExpected<void> fetchElements(const std::optional<uint32_t>& dc)
+    {
+        auto elements = db::selectAssetElementAll(dc);
+        if (!elements) {
+            return unexpected(elements.error());
+        }
+        m_elements = *elements;
+
+        createTree(m_root, 0);
+        collectLinks(m_root);
+
+        // sort;
+        return {};
+    }
+
+    AssetExpected<void> fetchAttributes(const db::WebAssetElement& el, db::Attributes& extAttrs)
+    {
+        auto extAttrsRet = db::selectExtAttributes(el.id);
+        if (!extAttrsRet) {
+            return unexpected(extAttrsRet.error());
+        }
+        extAttrs = *extAttrsRet;
+
+        auto it = extAttrs.find("logical_asset");
+        if (it != extAttrs.end()) {
+            auto extname = db::nameToExtName(it->second.value);
+            if (!extname) {
+                return unexpected(extname.error());
+            }
+            extAttrs["logical_asset"] = {*extname, it->second.readOnly};
+        }
+
+        return {};
+    }
+
 private:
+    // preset, updated from db
     std::vector<std::string> m_keytags = {"description", "ip.1", "company", "site_name", "region", "country", "address",
         "contact_name", "contact_email", "contact_phone", "u_size", "manufacturer", "model", "serial_no", "runtime",
         "installation_date", "maintenance_date", "maintenance_due", "location_u_pos", "location_w_pos",
         "end_warranty_date", "hostname.1", "http_link.1"};
 
-    std::vector<std::string> m_assetElementKeytags = {
+    // constant
+    const std::vector<std::string> m_assetElementKeytags = {
         "id", "name", "type", "sub_type", "location", "status", "priority", "asset_tag"};
 
     std::vector<db::WebAssetElement> m_elements;
