@@ -119,7 +119,7 @@ private:
 
         if (auto ret = exportRow(*el.element, lcs)) {
             for (auto& ch : el.children) {
-                if (auto res = exportRow(ch, lcs); !ret) {
+                if (auto res = exportRow(ch, lcs); !res) {
                     return unexpected(res.error());
                 }
             }
