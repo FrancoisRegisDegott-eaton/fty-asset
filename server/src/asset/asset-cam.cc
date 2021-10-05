@@ -72,7 +72,8 @@ void deleteMappings(const std::string& assetInternalName)
         log_debug("Deleting all mappings for asset %s", assetInternalName.c_str());
         // remove CAM mappings
         cam::Accessor camAccessor(CAM_CLIENT_ID, CAM_TIMEOUT_MS, MALAMUTE_ENDPOINT);
-        auto mappings = camAccessor.getAssetMappings(assetInternalName);
+        //delete only my mapping
+        auto mappings = camAccessor.getMappings(assetInternalName, CAM_SERVICE_ID);
         for(const auto& m : mappings) {
             log_debug("Deleting mapping %s : %s", m.m_serviceId.c_str(), m.m_protocol.c_str());
             camAccessor.removeMapping(m.m_assetId, m.m_serviceId, m.m_protocol);
