@@ -143,8 +143,13 @@ Expected<std::vector<WebAssetElement>> selectAssetElementsByType(uint16_t type_i
 /// @param priority priority
 /// @param assetTag asset tag
 /// @return affected rows count or error
-Expected<uint> updateAssetElement(fty::db::Connection& conn, uint32_t elementId, uint32_t parentId,
-    const std::string& status, uint16_t priority, const std::string& assetTag); //! test
+Expected<uint> updateAssetElement(
+    fty::db::Connection& conn,
+    uint32_t             elementId,
+    uint32_t             parentId,
+    const std::string&   status,
+    uint16_t             priority,
+    const std::string&   assetTag); //! test
 
 /// Deletes all ext attributes of given asset with given 'read_only' status
 /// @param conn database established connection
@@ -158,8 +163,8 @@ Expected<uint> deleteAssetExtAttributesWithRo(fty::db::Connection& conn, uint32_
 /// @param attributes attributes map - {key, value}
 /// @param readOnly 'read_only' status
 /// @return affected rows count or error
-Expected<uint> insertIntoAssetExtAttributes(fty::db::Connection& conn, uint32_t elementId,
-    const std::map<std::string, std::string>& attributes, bool readOnly); //! test
+Expected<uint> insertIntoAssetExtAttributes(
+    fty::db::Connection& conn, uint32_t elementId, const std::map<std::string, std::string>& attributes, bool readOnly); //! test
 
 /// Delete asset from all group
 /// @param conn database established connection
@@ -179,8 +184,7 @@ Expected<uint32_t> insertIntoAssetElement(fty::db::Connection& conn, const Asset
 /// @param groups groups id to insert
 /// @param elementId element id
 /// @return count of affected rows or error
-Expected<uint> insertElementIntoGroups(
-    fty::db::Connection& conn, const std::set<uint32_t>& groups, uint32_t elementId); //! test
+Expected<uint> insertElementIntoGroups(fty::db::Connection& conn, const std::set<uint32_t>& groups, uint32_t elementId); //! test
 
 /// Deletes all links which have given asset as 'dest'
 /// @param conn database established connection
@@ -205,16 +209,14 @@ Expected<uint> insertIntoAssetLinks(fty::db::Connection& conn, const std::vector
 /// @param deviceTypeId device type
 /// @param deviceName device name
 /// @return new relation id or error
-Expected<uint16_t> insertIntoMonitorDevice(
-    fty::db::Connection& conn, uint16_t deviceTypeId, const std::string& deviceName); //! test
+Expected<uint16_t> insertIntoMonitorDevice(fty::db::Connection& conn, uint16_t deviceTypeId, const std::string& deviceName); //! test
 
 /// Inserts monitor_id<->element_id relation
 /// @param conn database established connection
 /// @param monitorId monitor id
 /// @param elementId element id
 /// @return new relation id or error
-Expected<int64_t> insertIntoMonitorAssetRelation(
-    fty::db::Connection& conn, uint16_t monitorId, uint32_t elementId); //! test
+Expected<int64_t> insertIntoMonitorAssetRelation(fty::db::Connection& conn, uint16_t monitorId, uint32_t elementId); //! test
 
 /// Selects id based on name from v_bios_device_type
 /// @param conn database established connection
@@ -237,8 +239,14 @@ Expected<void> selectAssetElementSuperParent(uint32_t id, SelectCallback&& cb); 
 /// @param status asset status
 /// @param cb callback function
 /// @return nothing or error
-Expected<void> selectAssetsByContainer(fty::db::Connection& conn, uint32_t elementId, std::vector<uint16_t> types,
-    std::vector<uint16_t> subtypes, const std::string& without, const std::string& status, SelectCallback&& cb);
+Expected<void> selectAssetsByContainer(
+    fty::db::Connection&         conn,
+    uint32_t                     elementId,
+    const std::vector<uint16_t>& types,
+    const std::vector<uint16_t>& subtypes,
+    const std::string&           without,
+    const std::string&           status,
+    SelectCallback&&             cb);
 
 /// Selects assets from given container
 /// @param elementId asset element id
@@ -251,8 +259,22 @@ Expected<void> selectAssetsByContainer(uint32_t elementId, SelectCallback&& cb);
 /// @param subtypes asset subtypes to select
 /// @param cb callback function
 /// @return nothing or error
-Expected<void> selectAssetsWithoutContainer(
-    const std::vector<uint16_t>& types, const std::vector<uint16_t>& subtypes, SelectCallback&& cb);
+Expected<void> selectAssetsWithoutContainer(const std::vector<uint16_t>& types, const std::vector<uint16_t>& subtypes, SelectCallback&& cb);
+
+/// selects all assets (with and wihout container)
+/// @param conn database established connection
+/// @param types asset types to select
+/// @param subtypes asset subtypes to select
+/// @param status asset status
+/// @param cb callback function
+/// @return nothing or error
+Expected<void> selectAssetsAllContainer(
+    fty::db::Connection&         conn,
+    const std::vector<uint16_t>& types,
+    const std::vector<uint16_t>& subtypes,
+    const std::string&           without,
+    const std::string&           status,
+    SelectCallback&&             cb);
 
 /// Gets data about the links the specified device belongs to
 /// @param elementId element id
@@ -264,13 +286,28 @@ Expected<std::vector<DbAssetLink>> selectAssetDeviceLinksTo(uint32_t elementId, 
 /// @param typeId type id
 /// @param subtypeId subtype id
 /// @return map of devices or error
-Expected<std::map<uint32_t, std::string>> selectShortElements(uint16_t typeId, uint16_t subtypeId); //! test
+Expected<std::vector<std::pair<uint32_t, std::string>>> selectShortElements(
+    uint16_t typeId, uint16_t subtypeId, const std::string& order = {}, const std::string& orderDir = {}); //! test
+
+/// Selects all devices of certain type/subtype
+/// @param typeId type id
+/// @param subtypeId subtype id
+/// @return map of devices or error
+Expected<std::vector<std::pair<uint32_t, std::string>>> selectShortElements(
+    uint16_t typeId, const std::vector<uint16_t>& subtypeId, const std::string& order = {}, const std::string& orderDir = {}); //! test
 
 /// Returns how many times is gived a couple keytag/value in t_bios_asset_ext_attributes
 /// @param keytag keytag
 /// @param value asset name
 /// @return count or error
 Expected<int> countKeytag(const std::string& keytag, const std::string& value); //! test
+
+/// Checks if a couple keytag/value exist for an asset in t_bios_asset_ext_attributes
+/// @param elementId asset element id
+/// @param keytag keytag
+/// @param value asset name
+/// @return 0 if there is no such pair in db yet, >0 if the pair exist in db or errror
+Expected<int32_t> hasAssetKeytagValue(fty::db::Connection& conn, uint32_t elementId, const std::string& keytag, const std::string& value);
 
 /// Converts asset id to monitor id
 /// @param assetElementId asset element id
