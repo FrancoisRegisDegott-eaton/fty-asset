@@ -103,7 +103,7 @@ static fty::Expected<std::string> assetExtSql(const Filter& filter, const Order&
 
     std::string orderBy;
     if (order) {
-        orderBy = "ORDER BY {} {}"_format(
+        orderBy = "ORDER BY {0} {1}, id {1}"_format(
             order.dir == Order::Dir::Asc ? "COALESCE (orderAttr.value, 'ZZZZZZ999999')" : "orderAttr.value",
             order.dir == Order::Dir::Asc ? "ASC" : "DESC");
     }
