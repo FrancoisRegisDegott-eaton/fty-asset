@@ -315,7 +315,7 @@ Expected<WebAssetElement> selectAssetElementWebByName(const std::string& name)
 
 Expected<std::vector<WebAssetElement>> selectAssetElementsByType(uint16_t type_id, const std::string& status)
 {
-    std::vector<WebAssetElement>           items;
+    std::vector<WebAssetElement> items;
 
     static const std::string sql = webAssetSql() + R"(
         WHERE
@@ -409,8 +409,13 @@ Expected<std::map<uint32_t, std::string>> selectAssetElementGroups(uint32_t elem
 
 // =====================================================================================================================
 
-Expected<uint> updateAssetElement(fty::db::Connection& db, uint32_t elementId, uint32_t parentId,
-    const std::string& status, uint16_t priority, const std::string& assetTag)
+Expected<uint> updateAssetElement(
+    fty::db::Connection& db,
+    uint32_t             elementId,
+    uint32_t             parentId,
+    const std::string&   status,
+    uint16_t             priority,
+    const std::string&   assetTag)
 {
     static const std::string sql = R"(
         UPDATE
@@ -472,7 +477,8 @@ Expected<uint> deleteAssetExtAttributesWithRo(fty::db::Connection& conn, uint32_
 Expected<uint> insertIntoAssetExtAttributes(
     fty::db::Connection& conn, uint32_t elementId, const std::map<std::string, std::string>& attributes, bool readOnly)
 {
-    const std::string sql = fmt::format(R"(
+    const std::string sql = fmt::format(
+        R"(
         INSERT INTO
             t_bios_asset_ext_attributes (keytag, value, id_asset_element, read_only)
         VALUES
@@ -541,7 +547,8 @@ Expected<uint> insertElementIntoGroups(fty::db::Connection& conn, const std::set
         return 0;
     }
 
-    const std::string sql = fmt::format(R"(
+    const std::string sql = fmt::format(
+        R"(
         INSERT INTO
             t_bios_asset_group_relation
             (id_asset_group, id_asset_element)
@@ -793,8 +800,7 @@ Expected<int64_t> insertIntoAssetLink(fty::db::Connection& conn, const AssetLink
 
 // =====================================================================================================================
 
-Expected<uint16_t> insertIntoMonitorDevice(
-    fty::db::Connection& conn, uint16_t deviceTypeId, const std::string& deviceName)
+Expected<uint16_t> insertIntoMonitorDevice(fty::db::Connection& conn, uint16_t deviceTypeId, const std::string& deviceName)
 {
     static const std::string sql = R"(
         INSERT INTO t_bios_discovered_device
@@ -946,8 +952,14 @@ Expected<void> selectAssetElementSuperParent(uint32_t id, SelectCallback&& cb)
 
 // =====================================================================================================================
 
-Expected<void> selectAssetsByContainer(fty::db::Connection& conn, uint32_t elementId, std::vector<uint16_t> types,
-    std::vector<uint16_t> subtypes, const std::string& without, const std::string& status, SelectCallback&& cb)
+Expected<void> selectAssetsByContainer(
+    fty::db::Connection&         conn,
+    uint32_t                     elementId,
+    const std::vector<uint16_t>& types,
+    const std::vector<uint16_t>& subtypes,
+    const std::string&           without,
+    const std::string&           status,
+    SelectCallback&&             cb)
 {
     std::string select = R"(
         SELECT
@@ -1038,8 +1050,83 @@ Expected<void> selectAssetsByContainer(uint32_t elementId, SelectCallback&& cb)
 
 // =====================================================================================================================
 
-Expected<void> selectAssetsWithoutContainer(
-    const std::vector<uint16_t>& types, const std::vector<uint16_t>& subtypes, SelectCallback&& cb)
+Expected<void> selectAssetsAllContainer(
+    fty::db::Connection&         conn,
+    const std::vector<uint16_t>& types,
+    const std::vector<uint16_t>& subtypes,
+    const std::string&           without,
+    const std::string&           status,
+    SelectCallback&&             cb)
+{
+    LOG_START;
+
+    try {
+        std::string select =
+            " SELECT "
+            "   t.name, "
+            "   t.id_asset_element as asset_id, "
+            "   t.id_type as type_id, "
+            "   t.id_subtype as subtype_id "
+            " FROM "
+            "   t_bios_asset_element as t";
+
+        if (!subtypes.empty() || !types.empty() || status != "" || without != "") {
+            select += " WHERE ";
+        }
+
+        std::vector<std::string> cases;
+
+        if (!subtypes.empty()) {
+            cases.emplace_back(fmt::format("t.id_subtype in ({})", implode(subtypes, ", ")));
+        }
+        if (!types.empty()) {
+            cases.emplace_back(fmt::format("t.id_type in ({})", implode(types, ", ")));
+        }
+        if (!status.empty()) {
+            cases.emplace_back(fmt::format("t.status = \"{}\"", status));
+        }
+
+        std::string endSelect;
+        if (without != "") {
+            if (without == "location") {
+                cases.emplace_back("t.id_parent is NULL");
+            } else if (without == "powerchain") {
+                endSelect +=
+                    " NOT EXISTS "
+                    " (SELECT id_asset_device_dest "
+                    "  FROM t_bios_asset_link_type as l JOIN t_bios_asset_link as a"
+                    "  ON a.id_asset_link_type=l.id_asset_link_type "
+                    "  WHERE "
+                    "     name=\"power chain\" "
+                    "     AND t.id_asset_element=a.id_asset_device_dest)";
+            } else {
+                endSelect +=
+                    " NOT EXISTS "
+                    " (SELECT a.id_asset_element "
+                    "  FROM "
+                    "     t_bios_asset_ext_attributes as a "
+                    "  WHERE "
+                    "     a.keytag=\"" +
+                    without +
+                    "\""
+                    "     AND t.id_asset_element = a.id_asset_element)";
+            }
+        }
+
+        select += implode(cases, " AND ") + endSelect;
+
+        for (auto& row : conn.select(select)) {
+            cb(row);
+        }
+        return {};
+    } catch (const std::exception& e) {
+        return unexpected(error(Errors::InternalError).format(e.what()));
+    }
+}
+
+// =====================================================================================================================
+
+Expected<void> selectAssetsWithoutContainer(const std::vector<uint16_t>& types, const std::vector<uint16_t>& subtypes, SelectCallback&& cb)
 {
     std::string select = R"(
         SELECT
@@ -1166,33 +1253,59 @@ Expected<std::vector<DbAssetLink>> selectAssetDeviceLinksTo(uint32_t elementId, 
 
 // =====================================================================================================================
 
-Expected<std::map<uint32_t, std::string>> selectShortElements(uint16_t typeId, uint16_t subtypeId)
+Expected<std::vector<std::pair<uint32_t, std::string>>> selectShortElements(
+    uint16_t typeId, uint16_t subtypeId, const std::string& order, const std::string& orderDir)
 {
-    std::string sql = R"(
-        SELECT
-            v.name, v.id
-        FROM
-            v_bios_asset_element v
-        WHERE
-            v.id_type = :typeid
-    )";
+    return selectShortElements(typeId, std::vector<uint16_t>{subtypeId}, order, orderDir);
+}
 
-    if (subtypeId) {
-        sql += "AND v.id_subtype = :subtypeid";
+Expected<std::vector<std::pair<uint32_t, std::string>>> selectShortElements(
+    uint16_t typeId, const std::vector<uint16_t>& subtypeId, const std::string& order, const std::string& orderDir)
+{
+    std::string sql;
+
+    if (order.empty()) {
+        sql = R"(
+            SELECT
+                v.name, v.id
+            FROM
+                v_bios_asset_element v
+            WHERE
+                v.id_type = :typeid
+        )";
+        if (!subtypeId.empty()) {
+            sql += "AND v.id_subtype in (:subtypeid)";
+        }
+    } else {
+        sql = fmt::format(
+            R"(
+            SELECT
+                v.name, v.id, a.value
+            FROM
+                v_bios_asset_element v
+            LEFT JOIN t_bios_asset_ext_attributes a
+                ON v.id = id_asset_element AND keytag = '{}'
+            WHERE
+                v.id_type = :typeid
+                {}
+            ORDER BY {} {}
+        )",
+            order, !subtypeId.empty() ? "AND v.id_subtype in (:subtypeid)" : "",
+            orderDir.empty() || orderDir == "ASC" ? "COALESCE (a.value, 'ZZZZZZ999999')" : "", !orderDir.empty() ? orderDir : "ASC");
     }
 
     try {
         fty::db::Connection conn;
         auto                st = conn.prepare(sql);
         st.bind("typeid"_p = typeId);
-        if (subtypeId) {
-            st.bind("subtypeid"_p = subtypeId);
+        if (!subtypeId.empty()) {
+            st.bind("subtypeid"_p = implode(subtypeId, ", "));
         }
 
-        std::map<uint32_t, std::string> item;
+        std::vector<std::pair<uint32_t, std::string>> item;
 
         for (auto const& row : st.select()) {
-            item.emplace(row.get<uint32_t>("id"), row.get("name"));
+            item.emplace_back(row.get<uint32_t>("id"), row.get("name"));
         }
 
         return std::move(item);
@@ -1200,6 +1313,7 @@ Expected<std::map<uint32_t, std::string>> selectShortElements(uint16_t typeId, u
         return unexpected(error(Errors::ExceptionForElement).format(e.what(), typeId));
     }
 }
+
 
 // =====================================================================================================================
 
@@ -1222,6 +1336,35 @@ Expected<int> countKeytag(const std::string& keytag, const std::string& value)
             "value"_p  = value
         ).get<int>("count");
         // clang-format on
+    } catch (const std::exception& e) {
+        return unexpected(error(Errors::ExceptionForElement).format(e.what(), keytag));
+    }
+}
+
+// =====================================================================================================================
+
+Expected<int32_t> hasAssetKeytagValue(fty::db::Connection& conn, uint32_t elementId, const std::string& keytag, const std::string& value)
+{
+    static std::string sql = R"(
+        SELECT
+            COUNT(*) AS count
+        FROM
+            t_bios_asset_ext_attributes
+        WHERE id_asset_element = :element_id
+            AND keytag = :keytag AND value = :value
+    )";
+
+    try {
+        // clang-format off
+        auto row = conn.selectRow(sql,
+            "element_id"_p = elementId,
+            "keytag"_p = keytag,
+            "value"_p = value
+        );
+        // clang-format on
+        return row.get<int32_t>("count");
+    } catch (const fty::db::NotFound& e) {
+        return 0;
     } catch (const std::exception& e) {
         return unexpected(error(Errors::ExceptionForElement).format(e.what(), keytag));
     }
@@ -1517,8 +1660,7 @@ Expected<WebAssetElement> findParentByType(uint32_t assetId, uint16_t parentType
             }
         }
 
-        return unexpected(
-            error(Errors::ElementNotFound).format("parent with type " + persist::typeid_to_type(parentType)));
+        return unexpected(error(Errors::ElementNotFound).format("parent with type " + persist::typeid_to_type(parentType)));
     } catch (const std::exception& e) {
         return unexpected(error(Errors::ExceptionForElement).format(e.what(), assetId));
     }

@@ -19,6 +19,11 @@ etn_target(shared ${PROJECT_NAME}-libng
         asset/error.h
         asset/json.h
 
+        asset/asset-db2.h
+        asset/db/defs.h
+        asset/db/misc.h
+        asset/db/select.h
+
     SOURCES
         src/json.cpp
         src/asset-cam.cpp
@@ -36,6 +41,9 @@ etn_target(shared ${PROJECT_NAME}-libng
         src/manager/create.cpp
         src/manager/import.cpp
         src/manager/export.cpp
+
+        src/db/misc.cpp
+        src/db/select.cpp
     INCLUDE_DIRS src
     USES
         mlm
@@ -105,6 +113,9 @@ etn_test_target(fty-asset-libng
         test/export.cpp
         test/delete.cpp
         test/usize.cpp
+
+        test/db2/misc.cpp
+        test/db2/select.cpp
     CONFIGS
         test/conf/logger.conf
     USES

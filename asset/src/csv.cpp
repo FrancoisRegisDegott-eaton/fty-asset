@@ -423,10 +423,11 @@ static void process_ext_key(const cxxtools::SerializationInfo& ext_si, std::vect
                     break;
                 }
 
-                std::string value;
+                cxxtools::String value;
                 oneAttr.getValue(value);
                 data[0].push_back(name);
-                data[1].push_back(value);
+
+                data[1].push_back(cxxtools::Utf8Codec::encode(value));
             }
         }
     } else if (ext_si.category() == cxxtools::SerializationInfo::Object) {
@@ -495,10 +496,10 @@ static void s_read_si(const cxxtools::SerializationInfo& si, std::vector<std::ve
             process_fqdns_key(si.getMember("fqdns"), data);
             continue;
         }
-        std::string value;
+        cxxtools::String value;
         it->getValue(value);
         data[0].push_back(name);
-        data[1].push_back(value);
+        data[1].push_back(cxxtools::Utf8Codec::encode(value));
     }
 }
 

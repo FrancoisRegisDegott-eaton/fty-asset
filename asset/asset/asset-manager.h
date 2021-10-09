@@ -11,16 +11,26 @@
 
 namespace fty::asset {
 
+enum class OrderDir
+{
+    Asc,
+    Desc
+};
+
 class AssetManager
 {
 public:
-    using AssetList  = std::map<uint32_t, std::string>;
+    using AssetList  = std::vector<std::pair<uint32_t, std::string>>;
     using ImportList = std::map<size_t, Expected<uint32_t>>;
 
 public:
     static AssetExpected<db::WebAssetElementExt> getItem(uint32_t id);
 
-    static AssetExpected<AssetList> getItems(const std::string& typeName, const std::string& subtypeName);
+    static AssetExpected<AssetList> getItems(const std::string& typeName, const std::string& subtypeName,
+        const std::string& order = "name", OrderDir orderDir = OrderDir::Asc);
+
+    static AssetExpected<AssetList> getItems(const std::string& typeName, const std::vector<std::string>& subtypeName,
+        const std::string& order = "name", OrderDir orderDir = OrderDir::Asc);
 
     static AssetExpected<db::AssetElement> deleteAsset(uint32_t id, bool sendNotify = true);
 
@@ -42,8 +52,8 @@ private:
     static AssetExpected<db::AssetElement> deleteDcRoomRowRack(const db::AssetElement& element);
     static AssetExpected<db::AssetElement> deleteGroup(const db::AssetElement& element);
     static AssetExpected<db::AssetElement> deleteDevice(const db::AssetElement& element);
-    static AssetExpected<uint32_t> importAsset(
-        const cxxtools::SerializationInfo& si, const std::string& user, bool sendNotify, fty::Translate& msg);
+    static AssetExpected<uint32_t>         importAsset(
+                const cxxtools::SerializationInfo& si, const std::string& user, bool sendNotify, fty::Translate& msg);
 };
 
 } // namespace fty::asset
