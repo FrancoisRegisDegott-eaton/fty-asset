@@ -293,6 +293,7 @@ static void process_ips_key(const cxxtools::SerializationInfo& si, std::vector<s
     int i = 1;
     for (const auto& oneElement : si) { // iterate through the array
         std::string name{"ip." + std::to_string(i)};
+        i++;
 
         // ips VS ip.X: avoid duplicate
         if (std::find(data[0].begin(), data[0].end(), name) != data[0].end()) {
@@ -303,7 +304,6 @@ static void process_ips_key(const cxxtools::SerializationInfo& si, std::vector<s
         oneElement.getValue(value);
         data[0].push_back(name);
         data[1].push_back(value);
-        i++;
     }
 }
 
