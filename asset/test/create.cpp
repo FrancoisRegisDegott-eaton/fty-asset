@@ -157,3 +157,50 @@ TEST_CASE("Create asset with SerializationInfo")
 
     CHECK(fty::asset::AssetManager::deleteAsset(*ret, false));
 }
+
+TEST_CASE("Create asset with SerializationInfo embeding ips member and ip.1 extended attr.")
+{
+    fty::SampleDb db(R"(
+        items:
+            - type     : Datacenter
+              name     : datacenter
+              ext-name : DC0
+        )");
+
+    static std::string json = R"({
+        "type": "device",
+        "status": "nonactive",
+        "sub_type": "epdu",
+        "name": "EATON EPDU MA 0U (309 32A 3P)18XC13:6XC19 H742H…",
+        "priority": "P3",
+        "location": "DC0",
+        "ips": ["10.130.33.191"],
+        "ext": [{
+                "ip.1": "10.130.33.191",
+                "read_only": "false"
+            }, {
+                "device.contact": "",
+                "read_only": "true"
+            }, {
+                "device.location": "",
+                "read_only": "true"
+            }
+        ]
+    })";
+
+    cxxtools::SerializationInfo si;
+    std::stringstream           jsonIn;
+    try {
+        jsonIn << json;
+        cxxtools::JsonDeserializer deserializer(jsonIn);
+        deserializer.deserialize(si);
+    } catch (const std::exception& e) {
+        REQUIRE(false);
+    }
+
+    auto ret = fty::asset::AssetManager::createAsset(si, "dummy", false);
+    REQUIRE_EXP(ret);
+    CHECK(*ret > 0);
+
+    CHECK(fty::asset::AssetManager::deleteAsset(*ret, false));
+}

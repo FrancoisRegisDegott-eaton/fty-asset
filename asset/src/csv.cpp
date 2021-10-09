@@ -292,9 +292,16 @@ static void process_ips_key(const cxxtools::SerializationInfo& si, std::vector<s
     // we need a counter for fields
     int i = 1;
     for (const auto& oneElement : si) { // iterate through the array
+        std::string name{"ip." + std::to_string(i)};
+
+        // ips VS ip.X: avoid duplicate
+        if (std::find(data[0].begin(), data[0].end(), name) != data[0].end()) {
+            continue;
+        }
+
         std::string value;
         oneElement.getValue(value);
-        data[0].push_back("ip." + std::to_string(i));
+        data[0].push_back(name);
         data[1].push_back(value);
         i++;
     }
@@ -410,6 +417,12 @@ static void process_ext_key(const cxxtools::SerializationInfo& ext_si, std::vect
                 if (name == "read_only") {
                     continue;
                 }
+
+                // ips VS ip.X: avoid duplicate
+                if ((name.find("ip.") == 0) && (std::find(data[0].begin(), data[0].end(), name) != data[0].end())) {
+                    break;
+                }
+
                 std::string value;
                 oneAttr.getValue(value);
                 data[0].push_back(name);
