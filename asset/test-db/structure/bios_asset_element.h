@@ -1,3 +1,4 @@
+#pragma once
 #include <fty_common_db_connection.h>
 
 namespace fty {

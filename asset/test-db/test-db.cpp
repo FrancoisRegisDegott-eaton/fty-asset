@@ -9,6 +9,7 @@
 #include "structure/bios_device_type.h"
 #include "structure/bios_discovered_device.h"
 #include "structure/bios_monitor_asset_relation.h"
+#include "structure/bios_tag.h"
 #include <filesystem>
 #include <fty_common_db_connection.h>
 #include <mariadb/mysql.h>
@@ -86,6 +87,7 @@ static void createDB()
     createAssetLink(conn);
     createDiscoveryDevice(conn);
     createMonitorAssetRelation(conn);
+    createTag(conn);
 }
 
 Expected<std::string> TestDb::create()
