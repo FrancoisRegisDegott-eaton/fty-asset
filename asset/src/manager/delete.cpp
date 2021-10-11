@@ -177,13 +177,17 @@ AssetExpected<db::AssetElement> AssetManager::deleteAsset(const db::AssetElement
                 return deleteDcRoomRowRack(asset);
             case persist::asset_type::GROUP:
                 return deleteGroup(asset);
-            case persist::asset_type::DEVICE: {
+            case persist::asset_type::DEVICE:
                 return deleteDevice(asset);
-            }
+            default:;
         }
 
-        logError("unknown type");
-        return unexpected("unknown type"_tr);
+		// fallback to deleteDevice()
+        logWarn("Fallback deletion for asset '{}' (type: {})", asset.name, asset.typeId);
+        return deleteDevice(asset);
+
+        //logError("unknown type");
+        //return unexpected("unknown type"_tr);
     }();
 
     // in case of error we need to try to activate the asset again.
