@@ -82,6 +82,7 @@ etn_target(shared ${PROJECT_NAME}-test-db
         test-db/structure/bios_device_type.h
         test-db/structure/bios_discovered_device.h
         test-db/structure/bios_monitor_asset_relation.h
+        test-db/structure/bios_tag.h
         test-db/sample-db.cpp
         test-db/test-db.cpp
     USES
