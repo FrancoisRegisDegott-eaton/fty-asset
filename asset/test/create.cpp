@@ -203,7 +203,7 @@ TEST_CASE("Create asset with SerializationInfo embeding ips member and ip.1 exte
         items:
             - type     : Datacenter
               name     : datacenter
-              ext-name : Data Center
+              ext-name : DC0
         )");
 
     static std::string json = R"({
