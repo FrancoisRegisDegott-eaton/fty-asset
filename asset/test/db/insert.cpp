@@ -239,3 +239,30 @@ TEST_CASE("Monitor")
     }
     REQUIRE(*ret2 > 0);
 }
+
+TEST_CASE("Asset/UTF-8")
+{
+    fty::SampleDb db("");
+
+    fty::db::Connection conn;
+
+    fty::asset::db::AssetElement el;
+    el.name      = "á";
+    el.status    = "active";
+    el.priority  = 1;
+    el.typeId    = persist::type_to_typeid("device");
+    el.subtypeId = persist::subtype_to_subtypeid("ups");
+
+    auto ret = fty::asset::db::insertIntoAssetElement(conn, el, true);
+    REQUIRE(ret);
+
+    auto check = fty::asset::db::selectAssetElementWebById(*ret);
+    REQUIRE(check);
+    CHECK(check->name == "á");
+
+    auto ret2 = fty::asset::db::deleteAssetElement(conn, check->id);
+    if (!ret2) {
+        FAIL(ret2.error());
+    }
+    REQUIRE(*ret2 > 0);
+}

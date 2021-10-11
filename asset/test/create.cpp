@@ -157,3 +157,44 @@ TEST_CASE("Create asset with SerializationInfo")
 
     CHECK(fty::asset::AssetManager::deleteAsset(*ret, false));
 }
+
+TEST_CASE("Create asset UTF-8")
+{
+    fty::SampleDb db(R"(
+        items:
+            - type     : Datacenter
+              name     : datacenter
+              ext-name : Data Center
+        )");
+
+    static std::string json = R"({
+        "location" :            "Data center",
+        "name" :                "dev1",
+        "powers":               [],
+        "priority" :            "P2",
+        "status" :              "active",
+        "sub_type" :            "N_A",
+        "type" :                "room",
+        "ext": [
+            {"asset_tag": "", "read_only": false},
+            {"contact_name": "Otesánek", "read_only": false},
+            {"contact_email": "奧特薩內克", "read_only": false},
+            {"contact_phone": "", "read_only": false},
+            {"description": "Жрал, жрал, недожрал", "read_only": false},
+            {"create_mode": "", "read_only": false},
+            {"update_ts": "", "read_only": false}
+        ]
+    })";
+
+    auto ret = fty::asset::AssetManager::createAsset(json, "dummy", false);
+    REQUIRE_EXP(ret);
+    CHECK(*ret > 0);
+
+    auto it = fty::asset::db::selectExtAttributes(*ret);
+    CHECK(it);
+    CHECK((*it)["contact_name"].value == "Otesánek");
+    CHECK((*it)["contact_email"].value == "奧特薩內克");
+    CHECK((*it)["description"].value == "Жрал, жрал, недожрал");
+
+    CHECK(fty::asset::AssetManager::deleteAsset(*ret, false));
+}

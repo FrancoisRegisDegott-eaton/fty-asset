@@ -141,8 +141,7 @@ TEST_CASE("Select asset")
 
     // selectShortElements
     {
-        auto res = fty::asset::db::selectShortElements(
-            persist::type_to_typeid("device"), persist::subtype_to_subtypeid("ups"));
+        auto res = fty::asset::db::selectShortElements(persist::type_to_typeid("device"), persist::subtype_to_subtypeid("ups"));
         if (!res) {
             FAIL(res.error());
         }
@@ -167,5 +166,4 @@ TEST_CASE("Select asset")
         }
         REQUIRE(*res > 0);
     }
-
 }
