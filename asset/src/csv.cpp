@@ -507,11 +507,6 @@ CsvMap CsvMap_from_serialization_info(const cxxtools::SerializationInfo& si)
 {
     std::vector<std::vector<std::string>> data = {{}, {}};
     s_read_si(si, data);
-    // print the data
-    // for ( unsigned int i = 0; i < data.size(); i++ ) {
-    //    log_debug ("%s = %s", (cxxtools::convert<std::string> (data.at(0).at(i)) ).c_str(),
-    //    (cxxtools::convert<std::string> (data.at(1).at(i))).c_str());
-    // }
     CsvMap cm{data};
     cm.deserialize();
     return cm;
