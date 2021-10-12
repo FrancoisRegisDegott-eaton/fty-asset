@@ -752,7 +752,7 @@ int s_topology_location_to (std::map<std::string, std::string> & param, std::str
                         json.append ("\t");
                     }
                     json.append("\"name\" : \"")
-                        .append(UTF8::escape (ext_name))
+                        .append(ext_name)
                         .append("\",\n");
                     for (int i = 0; i < indent; i++) {
                         json.append ("\t");
@@ -782,13 +782,13 @@ int s_topology_location_to (std::map<std::string, std::string> & param, std::str
                         json.append ("\t");
                     }
                     json.append("\"name\" : \"")
-                        .append(UTF8::escape (ext_name))
+                        .append(ext_name)
                         .append("\",\n");
                     for (int i = 0; i < indent; i++) {
                         json.append ("\t");
                     }
                     json.append("\"id\" : \"")
-                        .append(UTF8::escape (std::get<3>(row)))
+                        .append(std::get<3>(row))
                         .append("\"");
                     json.append(",\n");
                     json += "\"type\" : \"" + persist::typeid_to_type(static_cast<uint16_t>(std::get<1>(row))) + "\",";
