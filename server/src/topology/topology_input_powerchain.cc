@@ -243,6 +243,7 @@ int topology_input_powerchain (std::map<std::string, std::string> & param, std::
     try {
         std::ostringstream out;
         cxxtools::JsonSerializer serializer (out);
+        serializer.inputUtf8(true);
         serializer.serialize(topo).finish();
         json = out.str();
     }
