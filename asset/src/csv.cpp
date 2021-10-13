@@ -67,11 +67,14 @@ void CsvMap::deserialize()
     for (const std::string& title_name : _data[0]) {
         std::string title = _ci_strip(title_name);
         if (_title_to_index.count(title) == 1) {
-            std::string msg = TRANSLATE_ME("duplicate title name '%s'", title.c_str());
-            throw std::invalid_argument(msg);
+            /*std::string msg = TRANSLATE_ME("duplicate title name '%s'", title.c_str());
+            throw std::invalid_argument(msg);*/
+            log_warning("Duplicate title name '%s', we will still use the previous on.", title.c_str());
+        } else {
+            _title_to_index.emplace(title, i);            
         }
 
-        _title_to_index.emplace(title, i);
+
         i++;
     }
 }
