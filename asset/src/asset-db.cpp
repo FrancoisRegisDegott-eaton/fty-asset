@@ -1,8 +1,10 @@
 #include "asset/asset-db.h"
 #include "asset/asset-dto.h"
 #include "asset/error.h"
+#include <fty/convert.h>
 #include <fty/string-utils.h>
 #include <fty/translate.h>
+#include <fty_asset_dto.h>
 #include <fty_common_asset_types.h>
 #include <fty_common_db_connection.h>
 #include <fty_log.h>
@@ -43,27 +45,28 @@ static void fetchDto(const fty::db::Row& row, Dto& asset)
 {
     uint32_t assetId;
 
-    std::string tmp;
+    std::string tmpStr;
+    int32_t     tmpInt;
     row.get("id", assetId);
-    row.get("internalName", tmp);
-    asset.name = tmp;
-    row.get("type", tmp);
-    asset.type = tmp;
-    row.get("subtype", tmp);
-    asset.sub_type = tmp;
-    row.get("parent", tmp);
-    asset.parent = tmp;
-    row.get("status", tmp);
-    if (tmp == "active") {
-        asset.status = Dto::Status::Active;
-    } else if (tmp == "nonactive") {
-        asset.status = Dto::Status::Nonactive;
+    row.get("internalName", tmpStr);
+    asset.name = tmpStr;
+    row.get("type", tmpStr);
+    asset.type = tmpStr;
+    row.get("subtype", tmpStr);
+    asset.sub_type = tmpStr;
+    row.get("parent", tmpStr);
+    asset.parent = tmpStr;
+    row.get("status", tmpStr);
+    if (tmpStr == "active") {
+        asset.status = 1;
+    } else if (tmpStr == "nonactive") {
+        asset.status = 2;
     } else {
-        asset.status = Dto::Status::Unknown;
+        asset.status = 0;
     }
-    int32_t priority;
-    row.get("priority", priority);
-    asset.priority = priority;
+
+    row.get("priority", tmpInt);
+    asset.priority = tmpInt;
 
     auto attributes = selectExtAttributes(assetId);
     if (!attributes) {
