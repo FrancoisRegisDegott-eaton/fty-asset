@@ -1,4 +1,5 @@
 #include "asset/asset-db.h"
+#include "asset/asset-dto.h"
 #include "asset/error.h"
 #include <fty/string-utils.h>
 #include <fty/translate.h>
@@ -12,6 +13,83 @@
 namespace fty::asset::db {
 
 // =====================================================================================================================
+
+static std::string DtoBaseAssetSql()
+{
+    static const std::string sql = R"(
+        SELECT
+            a.id_asset_element as id,
+            a.name             as internalName,
+            t.name             as type,
+            d.name             as subtype,
+            a.id_parent        as parent,
+            a.status           as status,
+            a.priority         as priority
+        FROM
+            t_bios_asset_element a
+        LEFT JOIN
+                t_bios_asset_element_type AS t
+            ON
+                a.id_type = t.id_asset_element_type
+        LEFT JOIN
+                t_bios_asset_device_type AS d
+            ON
+                a.id_subtype = d.id_asset_device_type
+    )";
+    return sql;
+}
+
+static void fetchDto(const fty::db::Row& row, Dto& asset)
+{
+    uint32_t assetId;
+
+    std::string tmp;
+    row.get("id", assetId);
+    row.get("internalName", tmp);
+    asset.name = tmp;
+    row.get("type", tmp);
+    asset.type = tmp;
+    row.get("subtype", tmp);
+    asset.sub_type = tmp;
+    row.get("parent", tmp);
+    asset.parent = tmp;
+    row.get("status", tmp);
+    if (tmp == "active") {
+        asset.status = Dto::Status::Active;
+    } else if (tmp == "nonactive") {
+        asset.status = Dto::Status::Nonactive;
+    } else {
+        asset.status = Dto::Status::Unknown;
+    }
+    int32_t priority;
+    row.get("priority", priority);
+    asset.priority = priority;
+
+    auto attributes = selectExtAttributes(assetId);
+    if (!attributes) {
+        throw std::runtime_error(fmt::format("Failed to get external attributes for asset {}", assetId));
+    }
+
+    for (auto el : *attributes) {
+        const auto& key = el.first;
+
+        ExtEntry ext;
+        ext.value    = el.second.value;
+        ext.readOnly = el.second.readOnly;
+        ext.update   = false;
+
+        asset.ext.append(key, ext);
+    }
+
+    auto links = selectAssetLinks(assetId);
+    if (!links) {
+        throw std::runtime_error(fmt::format("Failed to get links for asset {}", assetId));
+    }
+
+    for (auto l : *links) {
+        asset.linked.append(l);
+    }
+}
 
 static std::string webAssetSql()
 {
@@ -260,6 +338,30 @@ Expected<WebAssetElement> selectAssetElementWebById(uint32_t elementId)
         return std::move(el);
     } else {
         return unexpected(ret.error());
+    }
+}
+
+// =====================================================================================================================
+
+Expected<void> selectAssetElementById(uint32_t elementId, Dto& asset)
+{
+    static const std::string sql = DtoBaseAssetSql() + R"(
+        WHERE
+            a.id_asset_element = :id
+    )";
+
+    try {
+        fty::db::Connection db;
+
+        auto row = db.selectRow(sql, "id"_p = elementId);
+
+        fetchDto(row, asset);
+
+        return {};
+    } catch (const fty::db::NotFound&) {
+        return unexpected(error(Errors::ElementNotFound).format(elementId));
+    } catch (const std::exception& e) {
+        return unexpected(error(Errors::ExceptionForElement).format(e.what(), elementId));
     }
 }
 
@@ -1493,6 +1595,38 @@ Expected<std::vector<uint32_t>> selectAssetDeviceLinksSrc(uint32_t elementId)
             ids.emplace_back(it.get<uint32_t>("id_asset_device_dest"));
         }
         return std::move(ids);
+    } catch (const std::exception& e) {
+        return unexpected(error(Errors::ExceptionForElement).format(e.what(), elementId));
+    }
+}
+
+Expected<std::vector<LinkEntry>> selectAssetLinks(uint32_t elementId)
+{
+    static const std::string sql = R"(
+        SELECT
+            l.id_link               AS link_id,
+            e.name                  AS name,
+            l.src_out               AS srcOut,
+            l.id_asset_link_type    AS linkType
+        FROM
+            t_bios_asset_link AS l
+        INNER JOIN
+            t_bios_asset_element AS e ON l.id_asset_device_src = e.id_asset_element
+        WHERE
+            l.id_asset_device_dest = :asset_id
+    )";
+
+    try {
+        fty::db::Connection    conn;
+        std::vector<LinkEntry> links;
+        for (const auto& it : conn.select(sql, "asset_id"_p = elementId)) {
+            LinkEntry l;
+            l.source    = it.get<std::string>("name");
+            l.link_type = it.get<int32_t>("linkType");
+            l.src_out   = it.get<std::string>("srcOut");
+            links.emplace_back(l);
+        }
+        return std::move(links);
     } catch (const std::exception& e) {
         return unexpected(error(Errors::ExceptionForElement).format(e.what(), elementId));
     }

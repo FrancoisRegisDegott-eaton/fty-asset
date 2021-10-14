@@ -1,6 +1,7 @@
 #pragma once
 
 #include "asset-db.h"
+#include "asset-dto.h"
 #include "error.h"
 #include <fty/expected.h>
 #include <fty/translate.h>
@@ -24,6 +25,7 @@ public:
     using ImportList = std::map<size_t, Expected<uint32_t>>;
 
 public:
+    static AssetExpected<Dto> getDto(const std::string& iname);
     static AssetExpected<db::WebAssetElementExt> getItem(uint32_t id);
 
     static AssetExpected<AssetList> getItems(const std::string& typeName, const std::string& subtypeName,

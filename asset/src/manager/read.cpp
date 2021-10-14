@@ -36,8 +36,7 @@ static std::vector<std::tuple<uint32_t, std::string, std::string, std::string>> 
             uint16_t    id_subtype = row.get<uint16_t>(std::get<3>(it));
 
             if (!name.empty()) {
-                ret.push_back(std::make_tuple(
-                    pid, name, persist::typeid_to_type(id_type), persist::subtypeid_to_subtype(id_subtype)));
+                ret.push_back(std::make_tuple(pid, name, persist::typeid_to_type(id_type), persist::subtypeid_to_subtype(id_subtype)));
             }
         }
     };
@@ -51,14 +50,14 @@ static std::vector<std::tuple<uint32_t, std::string, std::string, std::string>> 
     return ret;
 }
 
-AssetExpected<AssetManager::AssetList> AssetManager::getItems(const std::string& typeName,
-    const std::string& subtypeName, const std::string& order, OrderDir orderDir)
+AssetExpected<AssetManager::AssetList> AssetManager::getItems(
+    const std::string& typeName, const std::string& subtypeName, const std::string& order, OrderDir orderDir)
 {
     return getItems(typeName, std::vector<std::string>{subtypeName}, order, orderDir);
 }
 
-AssetExpected<AssetManager::AssetList> AssetManager::getItems(const std::string& typeName, const std::vector<std::string>& subtypeName,
-    const std::string& order, OrderDir orderDir)
+AssetExpected<AssetManager::AssetList> AssetManager::getItems(
+    const std::string& typeName, const std::vector<std::string>& subtypeName, const std::string& order, OrderDir orderDir)
 {
     uint16_t typeId = persist::type_to_typeid(typeName);
     if (typeId == persist::asset_type::TUNKNOWN) {
@@ -67,7 +66,7 @@ AssetExpected<AssetManager::AssetList> AssetManager::getItems(const std::string&
 
     std::vector<uint16_t> subtypeIds;
     if (typeName == "device") {
-        for(const auto& name: subtypeName) {
+        for (const auto& name : subtypeName) {
             auto id = persist::subtype_to_subtypeid(name);
             if (id == persist::asset_subtype::SUNKNOWN) {
                 return unexpected("Expected ups, epdu, pdu, genset, sts, server, feed"_tr);
@@ -82,6 +81,25 @@ AssetExpected<AssetManager::AssetList> AssetManager::getItems(const std::string&
             return unexpected(els.error());
         }
         return *els;
+    } catch (const std::exception& e) {
+        return unexpected(e.what());
+    }
+}
+
+AssetExpected<Dto> AssetManager::getDto(const std::string& iname)
+{
+    Dto asset;
+
+    auto id = db::nameToAssetId(iname);
+    if(!id) {
+        return fty::unexpected(id.error());
+    }
+
+    try {
+        if (auto ret = db::selectAssetElementById(*id, asset); !ret) {
+            return fty::unexpected(ret.error());
+        }
+        return std::move(asset);
     } catch (const std::exception& e) {
         return unexpected(e.what());
     }
