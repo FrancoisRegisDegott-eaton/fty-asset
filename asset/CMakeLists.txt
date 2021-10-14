@@ -15,6 +15,7 @@ etn_target(shared ${PROJECT_NAME}-libng
         asset/asset-import.h
         asset/asset-licensing.h
         asset/asset-manager.h
+        asset/asset-notifications.h
         asset/csv.h
         asset/db.h
         asset/error.h
@@ -33,8 +34,13 @@ etn_target(shared ${PROJECT_NAME}-libng
         src/asset-helpers.cpp
         src/asset-db.cpp
         src/asset-licensing.cpp
+        src/asset-notifications.cpp
         src/asset-import.cpp
         src/asset-configure-inform.cpp
+        src/messagebus/message-bus.h
+        src/messagebus/message-bus.cpp
+        src/messagebus/message.h
+        src/messagebus/message.cpp
         src/csv.cpp
 
         src/manager/read.cpp
@@ -61,6 +67,7 @@ etn_target(shared ${PROJECT_NAME}-libng
     USES_PUBLIC
         fty_common_logging
         fty_common_mlm
+        fty_common_messagebus
         fty_common_db
         fty_common
         fty_common_socket
