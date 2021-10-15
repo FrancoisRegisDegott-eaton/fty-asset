@@ -67,6 +67,7 @@ Depends:
     ${shlibs:Depends},
     ${misc:Depends},
     libfty-asset (= ${binary:Version}),
+    libfty-common-messagebus-dev,
     libfty-pack-dev
 Description: fty-asset development tools
 
