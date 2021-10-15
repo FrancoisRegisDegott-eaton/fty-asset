@@ -7,6 +7,7 @@ find_package(fty-cmake PATHS ${CMAKE_BINARY_DIR}/fty-cmake)
 etn_target(shared ${PROJECT_NAME}-libng
     PUBLIC
         asset/asset-cam.h
+        asset/asset-dto.h
         asset/asset-computed.h
         asset/asset-configure-inform.h
         asset/asset-db.h
@@ -14,6 +15,7 @@ etn_target(shared ${PROJECT_NAME}-libng
         asset/asset-import.h
         asset/asset-licensing.h
         asset/asset-manager.h
+        asset/asset-notifications.h
         asset/csv.h
         asset/db.h
         asset/error.h
@@ -32,8 +34,13 @@ etn_target(shared ${PROJECT_NAME}-libng
         src/asset-helpers.cpp
         src/asset-db.cpp
         src/asset-licensing.cpp
+        src/asset-notifications.cpp
         src/asset-import.cpp
         src/asset-configure-inform.cpp
+        src/messagebus/message-bus.h
+        src/messagebus/message-bus.cpp
+        src/messagebus/message.h
+        src/messagebus/message.cpp
         src/csv.cpp
 
         src/manager/read.cpp
@@ -44,7 +51,8 @@ etn_target(shared ${PROJECT_NAME}-libng
 
         src/db/misc.cpp
         src/db/select.cpp
-    INCLUDE_DIRS src
+    INCLUDE_DIRS
+        src
     USES
         mlm
         fty-asset
@@ -59,9 +67,11 @@ etn_target(shared ${PROJECT_NAME}-libng
     USES_PUBLIC
         fty_common_logging
         fty_common_mlm
+        fty_common_messagebus
         fty_common_db
         fty_common
         fty_common_socket
+        fty-pack
         fty-utils
 )
 

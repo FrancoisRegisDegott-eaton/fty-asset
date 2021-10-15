@@ -10,6 +10,11 @@ class Connection;
 class Row;
 } // namespace fty::db
 
+namespace fty::asset {
+class Dto;
+class LinkEntry;
+}
+
 namespace fty::asset::db {
 
 // =====================================================================================================================
@@ -110,6 +115,12 @@ Expected<AssetElement> selectAssetElementByName(const std::string& name, bool ex
 /// @param elementId asset element id
 /// @return WebAssetElement or error
 Expected<WebAssetElement> selectAssetElementWebById(uint32_t elementId); //! test
+
+/// Selects all data about asset in Asset DTO
+/// @param elementId asset element id
+/// @param asset fty::asset::Dto to select to
+/// @return nothing or error
+Expected<void> selectAssetElementById(uint32_t elementId, Dto& asset); //! test
 
 /// Selects all data about asset in WebAssetElement
 /// @param elementId asset element id
@@ -341,6 +352,11 @@ Expected<std::vector<uint32_t>> selectAssetsByParent(uint32_t parentId);
 /// @param elementId element id
 /// @return list of devices where element is linked or error
 Expected<std::vector<uint32_t>> selectAssetDeviceLinksSrc(uint32_t elementId); //! test
+
+/// Selects all corresponding links for element
+/// @param elementId element id
+/// @return list of LinkEntry elements or error
+Expected<std::vector<LinkEntry>> selectAssetLinks(uint32_t elementId); //! test
 
 Expected<std::map<std::string, int>> readElementTypes();
 Expected<std::map<std::string, int>> readDeviceTypes();
