@@ -41,44 +41,39 @@ static std::string DtoBaseAssetSql()
     return sql;
 }
 
+static uint32_t stringToStatus(const std::string& status)
+{
+    if (status == "active") {
+        return 1;
+    } else if (status == "nonactive") {
+        return 2;
+    }
+
+    return 0;
+}
+
 static void fetchDto(const fty::db::Row& row, Dto& asset)
 {
     uint32_t assetId;
 
-    std::string tmpStr;
-    int32_t     tmpInt;
-    row.get("id", assetId);
-    row.get("internalName", tmpStr);
-    asset.name = tmpStr;
-    row.get("type", tmpStr);
-    asset.type = tmpStr;
-    row.get("subtype", tmpStr);
-    asset.sub_type = tmpStr;
-    row.get("parent", tmpStr);
-    asset.parent = tmpStr;
-    row.get("status", tmpStr);
-    if (tmpStr == "active") {
-        asset.status = 1;
-    } else if (tmpStr == "nonactive") {
-        asset.status = 2;
-    } else {
-        asset.status = 0;
-    }
-
-    row.get("priority", tmpInt);
-    asset.priority = tmpInt;
+    assetId        = row.get<uint32_t>("id");
+    asset.name     = row.get("internalName");
+    asset.type     = row.get("type");
+    asset.sub_type = row.get("subtype");
+    asset.parent   = row.get("parent");
+    asset.status   = stringToStatus(row.get("status"));
+    asset.priority = row.get<uint32_t>("priority");
 
     auto attributes = selectExtAttributes(assetId);
     if (!attributes) {
         throw std::runtime_error(fmt::format("Failed to get external attributes for asset {}", assetId));
     }
 
-    for (auto el : *attributes) {
-        const auto& key = el.first;
+    for (const auto& [key, attrib] : *attributes) {
 
         ExtEntry ext;
-        ext.value    = el.second.value;
-        ext.readOnly = el.second.readOnly;
+        ext.value    = attrib.value;
+        ext.readOnly = attrib.readOnly;
         ext.update   = false;
 
         asset.ext.append(key, ext);
@@ -1624,9 +1619,9 @@ Expected<std::vector<LinkEntry>> selectAssetLinks(uint32_t elementId)
         std::vector<LinkEntry> links;
         for (const auto& it : conn.select(sql, "asset_id"_p = elementId)) {
             LinkEntry l;
-            l.source    = it.get<std::string>("name");
+            l.source    = it.get("name");
             l.link_type = it.get<int32_t>("linkType");
-            l.src_out   = it.get<std::string>("srcOut");
+            l.src_out   = it.get("srcOut");
             links.emplace_back(l);
         }
         return std::move(links);

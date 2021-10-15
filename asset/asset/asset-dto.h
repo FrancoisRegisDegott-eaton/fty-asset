@@ -37,7 +37,7 @@ struct Dto : public pack::Node
     pack::String type     = FIELD("type");
     pack::String sub_type = FIELD("sub_type");
     pack::String name     = FIELD("name");
-    pack::Int32  priority = FIELD("priority");
+    pack::UInt32 priority = FIELD("priority");
     pack::String parent   = FIELD("parent");
 
     pack::ObjectList<LinkEntry> linked = FIELD("linked");
