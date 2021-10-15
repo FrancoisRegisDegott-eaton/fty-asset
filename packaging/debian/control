@@ -66,7 +66,7 @@ Section: libdevel
 Depends:
     ${shlibs:Depends},
     ${misc:Depends},
-    libfty-asset,
+    libfty-asset (= ${binary:Version}),
     libfty-pack-dev
 Description: fty-asset development tools
 
@@ -97,7 +97,7 @@ Description: fty-asset accessor development tools
 Package: fty-asset-server
 Architecture: any
 Depends:
-    libfty-asset,
+    libfty-asset (= ${binary:Version}),
    ${shlibs:Depends},
    ${misc:Depends}
 Description: fty-asset-server 
