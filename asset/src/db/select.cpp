@@ -2,6 +2,7 @@
 #include "asset/error.h"
 #include <fty_common_asset_types.h>
 #include <fty_common_db_connection.h>
+#include <fty_log.h>
 #include <iostream>
 
 namespace fty::db::asset::select {
@@ -98,12 +99,14 @@ static fty::Expected<std::string> assetExtSql(const Filter& filter, const Order&
         orderJoin = R"(
             LEFT JOIN t_bios_asset_ext_attributes orderAttr
                 ON id = orderAttr.id_asset_element AND orderAttr.keytag = '{}'
+            LEFT JOIN t_bios_asset_ext_attributes secondOrderAttr
+                ON id = secondOrderAttr.id_asset_element AND secondOrderAttr.keytag = 'name'
         )"_format(order.field);
     }
 
     std::string orderBy;
     if (order) {
-        orderBy = "ORDER BY {0} {1}, id {1}"_format(
+        orderBy = "ORDER BY {0} {1}, secondOrderAttr.value {1}"_format(
             order.dir == Order::Dir::Asc ? "COALESCE (orderAttr.value, 'ZZZZZZ999999')" : "orderAttr.value",
             order.dir == Order::Dir::Asc ? "ASC" : "DESC");
     }
