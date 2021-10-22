@@ -313,7 +313,7 @@ OR
 
 * message MUST be multipart string message, where every string is asset iname (message MAY be empty)
 
-The FTY-ASSET-AGENT peer MUST respond with:
+The FTY-ASSET-AGENT peer act:
 
 * IF message was $all OR empty:
 
@@ -321,6 +321,17 @@ The FTY-ASSET-AGENT peer MUST respond with:
 * IF message was multipart string message
 
     publication of fty-proto asset update message on the stream ASSETS for each asset in request
+
+The FTY-ASSET-AGENT peer MUST respond to USER peer using MAILBOX SEND.
+
+* 'DONE'
+
+Example of bmsg request:
+```bash
+bmsg request asset-agent REPUBLISH
+bmsg request asset-agent REPUBLISH $all
+bmsg request asset-agent REPUBLISH ups-02973445
+```
 
 #### Assets in given container
 
@@ -471,6 +482,12 @@ where
 
    BAD\_COMMAND/ASSET\_NOT\_FOUND
 * subject of the message MUST be "ASSET\_DETAIL".
+
+
+Example of bmsg request:
+```bash
+bmsg request asset-agent ASSET_DETAIL GET 1234 ups-02973445
+```
 
 ### Stream subscriptions
 

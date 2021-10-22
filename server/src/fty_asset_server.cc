@@ -1333,6 +1333,19 @@ void fty_asset_server(zsock_t* pipe, void* args)
                     s_repeat_all(server, assets_to_publish);
                 }
                 zstr_free(&asset);
+
+                //reply
+                {
+                    const char* sender = mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient()));
+                    zmsg_t* msg = zmsg_new();
+                    zmsg_addstr(msg, "DONE");
+                    int rv = mlm_client_sendto(const_cast<mlm_client_t*>(server.getMailboxClient()),
+                        sender, subject.c_str(), NULL, 5000, &msg);
+                    zmsg_destroy(&msg);
+                    if (rv != 0) {
+                        log_error("%s:\tmlm_client_sendto failed ('%s')", server.getAgentName().c_str(), subject.c_str());
+                    }
+                }
             } else if (subject == "ASSET_MANIPULATION") {
                 s_handle_subject_asset_manipulation(server, &zmessage);
             } else if (subject == "ASSET_DETAIL") {
