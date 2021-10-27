@@ -88,6 +88,10 @@ AssetExpected<void> tryToPlaceAsset(uint32_t id, uint32_t parentId, uint32_t siz
         return unexpected("Size is wrong, should be greater than 0"_tr);
     }
 
+    if (!attr->count("u_size")) {
+        return unexpected("Size is not set"_tr);
+    }
+
     std::vector<bool> place;
     place.resize(convert<size_t>(attr->at("u_size").value), false);
 
