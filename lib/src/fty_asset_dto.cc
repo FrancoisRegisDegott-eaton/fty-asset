@@ -27,17 +27,14 @@
 */
 
 #include "fty_asset_dto.h"
-
 #include "conversion/full-asset.h"
 #include "conversion/json.h"
 #include "conversion/proto.h"
-
 #include <algorithm>
-#include <fty_proto.h>
-#include <sstream>
-
 #include <cxxtools/jsondeserializer.h>
 #include <cxxtools/jsonserializer.h>
+#include <fty_proto.h>
+#include <sstream>
 
 
 namespace fty {
@@ -136,8 +133,7 @@ void AssetLink::setExt(const AssetLink::ExtMap& ext)
     m_ext = ext;
 }
 
-void AssetLink::setExtEntry(
-    const std::string& key, const std::string& value, bool readOnly, bool forceUpdatedFalse)
+void AssetLink::setExtEntry(const std::string& key, const std::string& value, bool readOnly, bool forceUpdatedFalse)
 {
     if (m_ext.find(key) != m_ext.end()) {
         // key already exists, update values
@@ -182,7 +178,7 @@ void AssetLink::serialize(cxxtools::SerializationInfo& si) const
         ext.setName(SI_LINK_EXT);
     }
 
-    if(!m_secondaryID.empty()) {
+    if (!m_secondaryID.empty()) {
         si.addMember(SI_LINK_SECONDARY_ID) <<= m_secondaryID;
     }
 }
@@ -218,8 +214,7 @@ void AssetLink::deserialize(const cxxtools::SerializationInfo& si)
 bool operator==(const AssetLink& l, const AssetLink& r)
 {
     // note that the external map of attributes does not determine if two links are equal
-    return ((l.sourceId() == r.sourceId()) && (l.srcOut() == r.srcOut()) && (l.destIn() == r.destIn()) &&
-            (l.linkType() == r.linkType()));
+    return ((l.sourceId() == r.sourceId()) && (l.srcOut() == r.srcOut()) && (l.destIn() == r.destIn()) && (l.linkType() == r.linkType()));
 }
 
 void operator<<=(cxxtools::SerializationInfo& si, const AssetLink& l)
@@ -420,8 +415,7 @@ void Asset::clearExtMap()
     m_ext.clear();
 }
 
-void Asset::setExtEntry(
-    const std::string& key, const std::string& value, bool readOnly, bool forceUpdatedFalse)
+void Asset::setExtEntry(const std::string& key, const std::string& value, bool readOnly, bool forceUpdatedFalse)
 {
     if (m_ext.find(key) != m_ext.end()) {
         // key already exists, update values
@@ -433,20 +427,16 @@ void Asset::setExtEntry(
     }
 }
 
-void Asset::addLink(const std::string& sourceId, const std::string& scrOut, const std::string& destIn,
-    int linkType, const AssetLink::ExtMap& attributes)
+void Asset::addLink(
+    const std::string& sourceId, const std::string& scrOut, const std::string& destIn, int linkType, const AssetLink::ExtMap& attributes)
 {
     AssetLink l(sourceId, scrOut, destIn, linkType);
     l.setExt(attributes);
 
-    auto found = std::find(m_linkedAssets.begin(), m_linkedAssets.end(), l);
-    if (found == m_linkedAssets.end()) {
-        m_linkedAssets.push_back(l);
-    }
+    m_linkedAssets.push_back(l);
 }
 
-void Asset::removeLink(
-    const std::string& sourceId, const std::string& scrOut, const std::string& destIn, int linkType)
+void Asset::removeLink(const std::string& sourceId, const std::string& scrOut, const std::string& destIn, int linkType)
 {
     AssetLink l(sourceId, scrOut, destIn, linkType);
     auto      found = std::find(m_linkedAssets.begin(), m_linkedAssets.end(), l);
@@ -466,16 +456,15 @@ void Asset::setSecondaryID(const std::string& secondaryID)
     m_secondaryID = secondaryID;
 }
 
-//wrapper for address
+// wrapper for address
 Asset::AddressMap Asset::getAddressMap() const
 {
     Asset::AddressMap addresses;
 
-    for(uint16_t index = 0; index <= 255; index++ )
-    {
-        const std::string & address = getAddress(static_cast<uint8_t>(index));
+    for (uint16_t index = 0; index <= 255; index++) {
+        const std::string& address = getAddress(static_cast<uint8_t>(index));
 
-        if(!address.empty()){
+        if (!address.empty()) {
             addresses[static_cast<uint8_t>(index)] = address;
         }
     }
@@ -485,12 +474,12 @@ Asset::AddressMap Asset::getAddressMap() const
 
 const std::string& Asset::getAddress(uint8_t index) const
 {
-    return getExtEntry("ip."+std::to_string(index));
+    return getExtEntry("ip." + std::to_string(index));
 }
 
-void Asset::setAddress(uint8_t index, const std::string & address)
+void Asset::setAddress(uint8_t index, const std::string& address)
 {
-    setExtEntry("ip."+std::to_string(index), address);
+    setExtEntry("ip." + std::to_string(index), address);
 }
 
 void Asset::removeAddress(uint8_t index)
@@ -498,16 +487,15 @@ void Asset::removeAddress(uint8_t index)
     setAddress(index, "");
 }
 
-//Wrapper for Endpoints
-Asset::ProtocolMap  Asset::getProtocolMap() const
+// Wrapper for Endpoints
+Asset::ProtocolMap Asset::getProtocolMap() const
 {
     Asset::ProtocolMap protocols;
 
-    for(uint16_t index = 0; index <= 255; index++ )
-    {
-        const std::string & protocol = getEndpointProtocol(static_cast<uint8_t>(index));
+    for (uint16_t index = 0; index <= 255; index++) {
+        const std::string& protocol = getEndpointProtocol(static_cast<uint8_t>(index));
 
-        if(!protocol.empty()){
+        if (!protocol.empty()) {
             protocols[static_cast<uint8_t>(index)] = protocol;
         }
     }
@@ -515,38 +503,68 @@ Asset::ProtocolMap  Asset::getProtocolMap() const
     return protocols;
 }
 
-const std::string&  Asset::getEndpointProtocol(uint8_t index) const { return getEndpointData(index, "protocol"); }
-const std::string&  Asset::getEndpointPort(uint8_t index) const { return getEndpointData(index, "port"); }
-const std::string&  Asset::getEndpointSubAddress(uint8_t index) const { return getEndpointData(index, "sub_address"); }
-const std::string&  Asset::getEndpointOperatingStatus(uint8_t index) const { return getEndpointData(index, "status.operating"); }
-const std::string&  Asset::getEndpointErrorMessage(uint8_t index) const { return getEndpointData(index, "status.error_msg"); }
+const std::string& Asset::getEndpointProtocol(uint8_t index) const
+{
+    return getEndpointData(index, "protocol");
+}
+const std::string& Asset::getEndpointPort(uint8_t index) const
+{
+    return getEndpointData(index, "port");
+}
+const std::string& Asset::getEndpointSubAddress(uint8_t index) const
+{
+    return getEndpointData(index, "sub_address");
+}
+const std::string& Asset::getEndpointOperatingStatus(uint8_t index) const
+{
+    return getEndpointData(index, "status.operating");
+}
+const std::string& Asset::getEndpointErrorMessage(uint8_t index) const
+{
+    return getEndpointData(index, "status.error_msg");
+}
 
-const std::string&  Asset::getEndpointProtocolAttribute(uint8_t index, const std::string & attributeName) const 
+const std::string& Asset::getEndpointProtocolAttribute(uint8_t index, const std::string& attributeName) const
 {
     static std::string noProtocol;
 
     std::string protocol = getEndpointProtocol(index);
-    if(protocol.empty()) {
+    if (protocol.empty()) {
         return noProtocol;
     }
 
-    return getEndpointData(index, "."+protocol+"."+attributeName);
+    return getEndpointData(index, "." + protocol + "." + attributeName);
 }
 
-void Asset::setEndpointProtocol(uint8_t index, const std::string & val) { return setEndpointData(index, "protocol", val); }
-void Asset::setEndpointPort(uint8_t index, const std::string & val) { return setEndpointData(index, "port", val); }
-void Asset::setEndpointSubAddress(uint8_t index, const std::string & val) { return setEndpointData(index, "sub_address", val); }
-void Asset::setEndpointOperatingStatus(uint8_t index, const std::string & val) { return setEndpointData(index, "status.operating", val); }
-void Asset::setEndpointErrorMessage(uint8_t index, const std::string & val) { return setEndpointData(index, "status.error_msg", val); }
+void Asset::setEndpointProtocol(uint8_t index, const std::string& val)
+{
+    return setEndpointData(index, "protocol", val);
+}
+void Asset::setEndpointPort(uint8_t index, const std::string& val)
+{
+    return setEndpointData(index, "port", val);
+}
+void Asset::setEndpointSubAddress(uint8_t index, const std::string& val)
+{
+    return setEndpointData(index, "sub_address", val);
+}
+void Asset::setEndpointOperatingStatus(uint8_t index, const std::string& val)
+{
+    return setEndpointData(index, "status.operating", val);
+}
+void Asset::setEndpointErrorMessage(uint8_t index, const std::string& val)
+{
+    return setEndpointData(index, "status.error_msg", val);
+}
 
-void Asset::setEndpointProtocolAttribute(uint8_t index, const std::string & attributeName, const std::string & val)
+void Asset::setEndpointProtocolAttribute(uint8_t index, const std::string& attributeName, const std::string& val)
 {
     std::string protocol = getEndpointProtocol(index);
-    if(protocol.empty()) {
+    if (protocol.empty()) {
         return;
     }
 
-    return setEndpointData(index, "."+protocol+"."+attributeName, val);
+    return setEndpointData(index, "." + protocol + "." + attributeName, val);
 }
 
 void Asset::removeEndpoint(uint8_t index)
@@ -558,23 +576,23 @@ void Asset::removeEndpoint(uint8_t index)
     setEndpointErrorMessage(index, "");
 }
 
-const std::string&  Asset::getEndpointData(uint8_t index, const std::string &field) const
+const std::string& Asset::getEndpointData(uint8_t index, const std::string& field) const
 {
-    return getExtEntry("endpoint."+std::to_string(index)+"."+field);
+    return getExtEntry("endpoint." + std::to_string(index) + "." + field);
 }
 
-void  Asset::setEndpointData(uint8_t index, const std::string &field, const std::string & val)
+void Asset::setEndpointData(uint8_t index, const std::string& field, const std::string& val)
 {
-    setExtEntry("endpoint."+std::to_string(index)+"."+field, val);
+    setExtEntry("endpoint." + std::to_string(index) + "." + field, val);
 }
 
-//friendly name
+// friendly name
 const std::string& Asset::getFriendlyName() const
 {
     return getExtEntry("name");
 }
 
-void Asset::setFriendlyName(const std::string & friendlyName)
+void Asset::setFriendlyName(const std::string& friendlyName)
 {
     setExtEntry("name", friendlyName);
 }
@@ -592,9 +610,8 @@ void Asset::dump(std::ostream& os)
     os << "ext attrib  : " << m_secondaryID << std::endl;
 
     for (const auto& e : m_ext) {
-        os << "- key: " << e.first << " - value: " << e.second.getValue()
-           << (e.second.isReadOnly() ? " [ReadOny]" : "") << (e.second.wasUpdated() ? " [Updated]" : "")
-           << std::endl;
+        os << "- key: " << e.first << " - value: " << e.second.getValue() << (e.second.isReadOnly() ? " [ReadOny]" : "")
+           << (e.second.wasUpdated() ? " [Updated]" : "") << std::endl;
     }
 
     for (const auto& l : m_linkedAssets) {
@@ -609,19 +626,18 @@ void Asset::dump(std::ostream& os)
         os << "- ext attrib  : " << m_secondaryID << std::endl;
 
         for (const auto& e : l.ext()) {
-            os << "  - key: " << e.first << " - value: " << e.second.getValue()
-               << (e.second.isReadOnly() ? " [ReadOny]" : "") << (e.second.wasUpdated() ? " [Updated]" : "")
-               << std::endl;
+            os << "  - key: " << e.first << " - value: " << e.second.getValue() << (e.second.isReadOnly() ? " [ReadOny]" : "")
+               << (e.second.wasUpdated() ? " [Updated]" : "") << std::endl;
         }
     }
 }
 
 bool Asset::operator==(const Asset& asset) const
 {
-    return (m_internalName == asset.m_internalName && m_assetStatus == asset.m_assetStatus &&
-            m_assetType == asset.m_assetType && m_assetSubtype == asset.m_assetSubtype &&
-            m_parentIname == asset.m_parentIname && m_priority == asset.m_priority &&
-            m_assetTag == asset.m_assetTag && m_ext == asset.m_ext && m_linkedAssets == asset.m_linkedAssets);
+    return (
+        m_internalName == asset.m_internalName && m_assetStatus == asset.m_assetStatus && m_assetType == asset.m_assetType &&
+        m_assetSubtype == asset.m_assetSubtype && m_parentIname == asset.m_parentIname && m_priority == asset.m_priority &&
+        m_assetTag == asset.m_assetTag && m_ext == asset.m_ext && m_linkedAssets == asset.m_linkedAssets);
 }
 
 bool Asset::operator!=(const Asset& asset) const
@@ -674,7 +690,7 @@ void Asset::serialize(cxxtools::SerializationInfo& si) const
     ext = data;
     ext.setName(SI_EXT);
 
-    if(!m_secondaryID.empty()) {
+    if (!m_secondaryID.empty()) {
         si.addMember(SI_SECONDARY_ID) <<= m_secondaryID;
     }
 
@@ -715,7 +731,7 @@ void Asset::deserialize(const cxxtools::SerializationInfo& si)
         m_ext[key] = element;
     }
 
-    if(si.findMember(SI_SECONDARY_ID) != NULL) {
+    if (si.findMember(SI_SECONDARY_ID) != NULL) {
         si.getMember(SI_SECONDARY_ID) >>= m_secondaryID;
     }
 
@@ -878,34 +894,33 @@ UIAsset::UIAsset(const Asset& a)
 {
 }
 
-static constexpr const char* UI_ASSET_ID  = "id";
-static constexpr const char* UI_ASSET_LOCATION  = "location_id";
+static constexpr const char* UI_ASSET_ID            = "id";
+static constexpr const char* UI_ASSET_LOCATION      = "location_id";
 static constexpr const char* UI_ASSET_LOCATION_URI  = "location_uri";
-static constexpr const char* UI_ASSET_FRIENDLY_NAME  = "name";
-static constexpr const char* UI_TYPE  = "type";
-static constexpr const char* UI_SUBTYPE  = "sub_type";
-static constexpr const char* UI_PRIORITY  = "priority";
+static constexpr const char* UI_ASSET_FRIENDLY_NAME = "name";
+static constexpr const char* UI_TYPE                = "type";
+static constexpr const char* UI_SUBTYPE             = "sub_type";
+static constexpr const char* UI_PRIORITY            = "priority";
 
 void UIAsset::serializeUI(cxxtools::SerializationInfo& si) const
 {
     si.addMember(UI_ASSET_ID) <<= m_internalName;
 
-    if(!m_parentIname.empty())
-    {
+    if (!m_parentIname.empty()) {
         si.addMember(UI_ASSET_LOCATION) <<= m_parentIname;
-        si.addMember(UI_ASSET_LOCATION) <<= ("/api/v1/asset/"+ m_parentIname);
+        si.addMember(UI_ASSET_LOCATION) <<= ("/api/v1/asset/" + m_parentIname);
     }
 
     si.addMember(UI_ASSET_FRIENDLY_NAME) <<= getFriendlyName();
 
     si.addMember(UI_TYPE) <<= m_assetType;
     si.addMember(UI_SUBTYPE) <<= m_assetSubtype;
-    
-    si.addMember(UI_PRIORITY) <<= "P"+std::to_string(m_priority);
+
+    si.addMember(UI_PRIORITY) <<= "P" + std::to_string(m_priority);
 
 
     /*si.addMember(SI_LINKED) <<= m_linkedAssets;
-    
+
     // ext
     cxxtools::SerializationInfo& ext = si.addMember("");
 
@@ -931,4 +946,3 @@ void UIAsset::deserializeUI(const cxxtools::SerializationInfo& /*si*/)
 
 
 } // namespace fty
-
