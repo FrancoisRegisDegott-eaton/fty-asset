@@ -138,6 +138,12 @@ Expected<WebAssetElement> selectAssetElementWebByName(const std::string& name);
 /// @return Attributes map or error
 Expected<Attributes> selectExtAttributes(uint32_t elementId); //! test
 
+/// Selects all ext_attributes of asset with filters
+/// @param elementId asset element id
+/// @param filters all fiters inserted inside a map
+/// @return Attributes map or error
+Expected<Attributes> selectExtAttributes(uint32_t elementId, const std::map<std::string, std::string>& filters); //! test
+
 /// get information about the groups element belongs to
 /// @param elementId element id
 /// @return groups map or error

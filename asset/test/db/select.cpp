@@ -3,6 +3,7 @@
 #include <catch2/catch.hpp>
 #include <fty_common_asset_types.h>
 #include <fty_common_db_connection.h>
+#include <iostream>
 #include <test-db/sample-db.h>
 
 TEST_CASE("Select asset")
@@ -165,5 +166,59 @@ TEST_CASE("Select asset")
             FAIL(res.error());
         }
         REQUIRE(*res > 0);
+    }
+}
+
+TEST_CASE("Select asset with filters")
+{
+    std::string ipAddr = "10.130.33.34";
+
+    fty::SampleDb db(R"(
+        items:
+          - type     : Ups
+            name     : device
+            ext-name : Device name
+            attrs    :
+              ip.1: 10.130.33.34
+    )");
+
+    auto devId = db.idByName("device");
+
+    REQUIRE(devId);
+    CHECK(devId == 1);
+
+    // selectAssetElementWebById with filter
+    {
+        auto res = fty::asset::db::selectExtAttributes(devId, {{"keytag", "ip.1"}, {"value", ipAddr}});
+        if (!res) {
+            FAIL(res.error());
+        }
+
+        REQUIRE(res);
+        CHECK(res->size() == 1);
+        CHECK((*res)["ip.1"].value == ipAddr);
+    }
+
+    // selectAssetElementWebById without filter
+    {
+        auto res = fty::asset::db::selectExtAttributes(devId, {});
+        if (!res) {
+            FAIL(res.error());
+        }
+
+        REQUIRE(res);
+        CHECK(res->size() == 1);
+        CHECK((*res)["ip.1"].value == ipAddr);
+    }
+
+    // selectAssetElementWebById with wrong filter
+    {
+        auto res = fty::asset::db::selectExtAttributes(devId, {{"keytag", "ip.1"}, {"value", "127.0.0.1"}});
+        if (!res) {
+            FAIL(res.error());
+        }
+
+        REQUIRE(res);
+        CHECK(res->size() == 0);
     }
 }

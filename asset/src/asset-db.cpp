@@ -477,6 +477,54 @@ Expected<Attributes> selectExtAttributes(uint32_t elementId)
 
 // =====================================================================================================================
 
+Expected<Attributes> selectExtAttributes(uint32_t elementId, const std::map<std::string, std::string>& filters)
+{
+    static std::string sql = R"(
+        SELECT
+            v.keytag,
+            v.value,
+            v.read_only
+        FROM
+            v_bios_asset_ext_attributes v
+        WHERE
+            v.id_asset_element = :elementId)";
+
+    std::string filter;
+    for (const auto& [key, value] : filters) {
+        filter.append(" and ");
+        filter.append("v.");
+        filter.append(key);
+        filter.append(" = '");
+        filter.append(value);
+        filter.append("'");
+    }
+    sql.append(filter);
+    //std::cout << "Sql: " << sql << std::endl;
+
+    try {
+        fty::db::Connection db;
+
+        auto result = db.select(sql, "elementId"_p = elementId);
+
+        Attributes attrs;
+
+        for (const auto& row : result) {
+            ExtAttrValue val;
+
+            row.get("value", val.value);
+            row.get("read_only", val.readOnly);
+
+            attrs.emplace(row.get("keytag"), val);
+        }
+
+        return std::move(attrs);
+    } catch (const std::exception& e) {
+        return unexpected(error(Errors::ExceptionForElement).format(e.what(), elementId));
+    }
+}
+
+// =====================================================================================================================
+
 Expected<std::map<uint32_t, std::string>> selectAssetElementGroups(uint32_t elementId)
 {
     static std::string sql = R"(
