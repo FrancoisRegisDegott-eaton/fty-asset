@@ -130,5 +130,9 @@ bindings/qt/selftest/selftest
 # Netbeans directory
 nbproject/
 
+# vscode directory
+.history/
+.vscode/
+
 # editor backups
 *~
