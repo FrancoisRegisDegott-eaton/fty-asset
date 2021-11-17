@@ -189,7 +189,7 @@ TEST_CASE("Select asset with filters")
 
     // selectAssetElementWebById with filter
     {
-        auto res = fty::asset::db::selectExtAttributes(devId, {{"keytag", "ip.1"}, {"value", ipAddr}});
+        auto res = fty::asset::db::selectExtAttributes({{"keytag", "ip.1"}, {"value", ipAddr}});;
         if (!res) {
             FAIL(res.error());
         }
@@ -201,19 +201,18 @@ TEST_CASE("Select asset with filters")
 
     // selectAssetElementWebById without filter
     {
-        auto res = fty::asset::db::selectExtAttributes(devId, {});
+        auto res = fty::asset::db::selectExtAttributes({});
         if (!res) {
             FAIL(res.error());
         }
 
         REQUIRE(res);
-        CHECK(res->size() == 1);
-        CHECK((*res)["ip.1"].value == ipAddr);
+        CHECK(res->size() == 0);
     }
 
     // selectAssetElementWebById with wrong filter
     {
-        auto res = fty::asset::db::selectExtAttributes(devId, {{"keytag", "ip.1"}, {"value", "127.0.0.1"}});
+        auto res = fty::asset::db::selectExtAttributes({{"keytag", "ip.1"}, {"value", "127.0.0.1"}});
         if (!res) {
             FAIL(res.error());
         }

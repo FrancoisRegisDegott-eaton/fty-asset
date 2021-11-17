@@ -8,6 +8,7 @@
 #include <fty_common_asset_types.h>
 #include <fty_common_db_connection.h>
 #include <fty_log.h>
+#include <iostream>
 #include <sys/time.h>
 
 #define MAX_CREATE_RETRY 10
@@ -459,7 +460,6 @@ Expected<Attributes> selectExtAttributes(uint32_t elementId)
         auto result = db.select(sql, "elementId"_p = elementId);
 
         Attributes attrs;
-
         for (const auto& row : result) {
             ExtAttrValue val;
 
@@ -477,37 +477,37 @@ Expected<Attributes> selectExtAttributes(uint32_t elementId)
 
 // =====================================================================================================================
 
-Expected<Attributes> selectExtAttributes(uint32_t elementId, const std::map<std::string, std::string>& filters)
+Expected<Attributes> selectExtAttributes(const std::map<std::string, std::string>& filters)
 {
-    static std::string sql = R"(
+    std::string sql = R"(
         SELECT
             v.keytag,
             v.value,
             v.read_only
         FROM
             v_bios_asset_ext_attributes v
-        WHERE
-            v.id_asset_element = :elementId)";
+        )";
 
-    std::string filter;
-    for (const auto& [key, value] : filters) {
-        filter.append(" and ");
-        filter.append("v.");
-        filter.append(key);
-        filter.append(" = '");
-        filter.append(value);
-        filter.append("'");
+    if (filters.size() > 0) {
+        std::string filter("WHERE \n");
+        for (auto iter = filters.begin(); iter != filters.end(); ++iter) {
+            filter.append("v.");
+            filter.append(iter->first);
+            filter.append(" = '");
+            filter.append(iter->second);
+            filter.append("'");
+            if (std::next(iter) != filters.end()) {
+                filter.append(" and ");
+            }
+        }
+        sql.append(filter);
     }
-    sql.append(filter);
-    //std::cout << "Sql: " << sql << std::endl;
-
+    std::cout << "Sql: " << sql << std::endl;
     try {
         fty::db::Connection db;
-
-        auto result = db.select(sql, "elementId"_p = elementId);
+        auto result = db.select(sql);
 
         Attributes attrs;
-
         for (const auto& row : result) {
             ExtAttrValue val;
 
@@ -519,7 +519,7 @@ Expected<Attributes> selectExtAttributes(uint32_t elementId, const std::map<std:
 
         return std::move(attrs);
     } catch (const std::exception& e) {
-        return unexpected(error(Errors::ExceptionForElement).format(e.what(), elementId));
+        return unexpected(error(Errors::ExceptionForElement).format(e.what()));
     }
 }
 
