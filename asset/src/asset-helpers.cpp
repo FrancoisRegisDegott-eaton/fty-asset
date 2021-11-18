@@ -4,6 +4,11 @@
 #include <fty_asset_dto.h>
 #include <fty_common_agents.h>
 #include <fty_common_mlm.h>
+#include <openssl/sha.h>
+#include <sstream>
+#include <time.h>
+#include <utility>
+#include <uuid/uuid.h>
 
 #define AGENT_ASSET_ACTIVATOR      "etn-licensing-credits"
 #define COMMAND_IS_ASSET_ACTIVABLE "GET_IS_ASSET_ACTIVABLE"
@@ -11,6 +16,47 @@
 #define COMMAND_DEACTIVATE_ASSET   "DEACTIVATE_ASSET"
 
 namespace fty::asset {
+
+Uuid generateUUID(const AssetFilter& assetFilter)
+{
+    static std::string ns = "\x93\x3d\x6c\x80\xde\xa9\x8c\x6b\xd1\x11\x8b\x3b\x46\xa1\x81\xf1";
+    // std::string uuid;
+    auto result = Uuid{};
+
+    if (!assetFilter.manufacturer.empty() && !assetFilter.model.empty() && !assetFilter.serial.empty()) {
+        log_debug("generate full UUID");
+
+        std::string src = ns + assetFilter.manufacturer + assetFilter.model + assetFilter.serial;
+        // hash must be zeroed first
+        std::array<unsigned char, SHA_DIGEST_LENGTH> hash;
+        hash.fill(0);
+
+        SHA1(reinterpret_cast<const unsigned char*>(src.c_str()), src.length(), hash.data());
+
+        hash[6] &= 0x0F;
+        hash[6] |= 0x50;
+        hash[8] &= 0x3F;
+        hash[8] |= 0x80;
+
+        char uuid_char[37];
+        uuid_unparse_lower(hash.data(), uuid_char);
+
+        result.uuid = uuid_char;
+        result.type = UUID_TYPE_DCE_SHA1;
+    } else {
+        log_debug("generate random UUID");
+        uuid_t u;
+        uuid_generate_random(u);
+
+        char uuid_char[37];
+        uuid_unparse_lower(u, uuid_char);
+
+        result.uuid = uuid_char;
+        result.type = UUID_TYPE_DCE_RANDOM;
+    }
+
+    return result;
+}
 
 AssetExpected<uint32_t> checkElementIdentifier(const std::string& paramName, const std::string& paramValue)
 {
@@ -130,6 +176,30 @@ AssetExpected<void> tryToPlaceAsset(uint32_t id, uint32_t parentId, uint32_t siz
         if (place[i]) {
             return unexpected("Asset place is occupied"_tr);
         }
+    }
+
+    return {};
+}
+
+AssetExpected<void> checkDuplicateAsset(const AssetFilter& assetFilter)
+{
+    std::map<std::string, std::string> mapFilter;
+
+    auto uuidAsset = generateUUID(assetFilter);
+    if (uuidAsset.type != UUID_TYPE_DCE_RANDOM) {
+        mapFilter = {{"keytag", "uuid"}, {"value", uuidAsset.uuid}};
+    } else {
+        mapFilter = {{"keytag", "ip.1"}, {"value", assetFilter.ipAddr}};
+    }
+
+    auto res = fty::asset::db::selectExtAttributes(mapFilter);
+    if (!res) {
+        return unexpected("Select data base failed"_tr);
+    }
+    if (res->size() == 1) {
+        std::string err = "Asset '{}' already exist, duplicate it is forbidden"_tr.format(uuidAsset.uuid);
+        logError("Asset '{}' already exist, duplicate it is forbidden", uuidAsset.uuid);
+        return unexpected(error(Errors::ElementAlreadyExist).format(err));
     }
 
     return {};

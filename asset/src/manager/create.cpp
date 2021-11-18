@@ -86,20 +86,20 @@ AssetExpected<uint32_t> AssetManager::importAsset(
         logError("key 'id' is forbidden to be used");
         return unexpected(msg.format(itemName, "key 'id' is forbidden to be used"_tr));
     }
+    // If descriminantarepresent, check to not duplicate asset
+    if (cm.hasTitle("manufacturer") && cm.hasTitle("model") && cm.hasTitle("serial_no")) {
+      logDebug("All discriminant data are available, checking to not duplicate asset");
 
-    if (cm.hasTitle("ip.1")) {
-        auto ip = cm.get(1, "ip.1");
-        logDebug("Ip is set, checking to not duplicate asset with same ip address '{}'", ip);
+      std::string ipAddr = cm.hasTitle("ip.1") ? cm.get(1, "ip.1") : "";
+      AssetFilter assetFilter{cm.get(1, "manufacturer"), cm.get(1, "model"), cm.get(1, "serial_no"), ipAddr};
 
-        auto res = fty::asset::db::selectExtAttributes({{"keytag", "ip.1"}, {"value", ip}});
-        if (!res) {
-            return unexpected(msg.format(itemName, "Select data base failed"_tr));
-        }
-        if (res->size() == 1)
-        {
-          logError("Ip address is already present, duplicate it is forbidden");
-          return unexpected(msg.format(itemName, "Duplicate ip address is forbidden"_tr));
-        }
+      auto ret = checkDuplicateAsset(assetFilter);
+      if (!ret) {
+        return unexpected(msg.format(itemName, ret.error()));
+      }
+    }
+    else {
+      logError("Discriminant data are not availables, can not check duplicated asset");
     }
 
     if (sendNotify) {
