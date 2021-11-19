@@ -8,6 +8,7 @@
 #include <fty_common_asset_types.h>
 #include <fty_common_db_connection.h>
 #include <fty_log.h>
+#include <iostream>
 #include <sys/time.h>
 
 #define MAX_CREATE_RETRY 10
@@ -488,18 +489,12 @@ Expected<Attributes> selectExtAttributes(const std::map<std::string, std::string
         )";
 
     if (filters.size() > 0) {
-        std::string filter("WHERE \n");
-        for (auto iter = filters.begin(); iter != filters.end(); ++iter) {
-            filter.append("v.");
-            filter.append(iter->first);
-            filter.append(" = '");
-            filter.append(iter->second);
-            filter.append("'");
-            if (std::next(iter) != filters.end()) {
-                filter.append(" and ");
-            }
+        std::vector<std::string> filter;
+        for (const auto& [key, value] : filters) {
+            filter.push_back(fmt::format("v.{} = '{}'", key, value));
         }
-        sql.append(filter);
+        sql.append("WHERE \n");
+        sql.append(implode(filter, " and "));
     }
 
     try {
