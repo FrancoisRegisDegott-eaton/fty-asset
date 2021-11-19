@@ -25,6 +25,7 @@
 #include "asset-db.h"
 #include "asset-storage.h"
 #include "asset/dbhelpers.h"
+#include <asset/asset-helpers.h>
 #include <algorithm>
 #include <fty_common_mlm.h>
 #include <fty_common.h>
@@ -51,6 +52,8 @@
 #define COMMAND_DEACTIVATE_ASSET    "DEACTIVATE_ASSET"
 
 namespace fty {
+
+  using namespace fty::asset;
 
 //============================================================================================================
 
@@ -81,45 +84,6 @@ static std::string generateCurrentTimestamp()
     std::strftime(timeString, tmpSize - 1, "%FT%T%z", std::localtime(&timestamp));
 
     return std::string(timeString);
-}
-
-/// generate asset UUID (if manufacture, model and serial are known -> EATON namespace UUID, otherwise random)
-static std::string generateUUID(
-    const std::string& manufacturer, const std::string& model, const std::string& serial)
-{
-    static std::string ns = "\x93\x3d\x6c\x80\xde\xa9\x8c\x6b\xd1\x11\x8b\x3b\x46\xa1\x81\xf1";
-    std::string        uuid;
-
-    if (!manufacturer.empty() && !model.empty() && !serial.empty()) {
-        log_debug("generate full UUID");
-
-        std::string src = ns + manufacturer + model + serial;
-        // hash must be zeroed first
-        std::array<unsigned char, SHA_DIGEST_LENGTH> hash;
-        hash.fill(0);
-
-        SHA1(reinterpret_cast<const unsigned char*>(src.c_str()), src.length(), hash.data());
-
-        hash[6] &= 0x0F;
-        hash[6] |= 0x50;
-        hash[8] &= 0x3F;
-        hash[8] |= 0x80;
-
-        char uuid_char[37];
-        uuid_unparse_lower(hash.data(), uuid_char);
-
-        uuid = uuid_char;
-    } else {
-        uuid_t u;
-        uuid_generate_random(u);
-
-        char uuid_char[37];
-        uuid_unparse_lower(u, uuid_char);
-
-        uuid = uuid_char;
-    }
-
-    return uuid;
 }
 
 static AssetStorage& getStorage()
@@ -414,7 +378,8 @@ void AssetImpl::create()
         setExtEntry(fty::EXT_CREATE_TS, generateCurrentTimestamp(), true);
         // generate uuid if not already present in the payload
         if(getExtEntry("uuid").empty()) {
-            setExtEntry(fty::EXT_UUID, generateUUID(getManufacturer(), getModel(), getSerialNo()), true);
+            AssetFilter assetFilter{getManufacturer(), getModel(), getSerialNo()};
+            setExtEntry(fty::EXT_UUID, generateUUID(assetFilter).uuid, true);
         }
 
         m_storage.insert(*this);
