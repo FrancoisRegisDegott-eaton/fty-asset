@@ -38,9 +38,7 @@ etn_target(exe ${PROJECT_NAME}-server
         tntdb
         czmq
         mlm
-        crypto
         protobuf
-        uuid
 )
 
 #install stystemd config

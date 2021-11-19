@@ -26,22 +26,13 @@
 #include "asset-storage.h"
 #include "asset/dbhelpers.h"
 #include <asset/asset-helpers.h>
-#include <algorithm>
 #include <fty_common_mlm.h>
 #include <fty_common.h>
 #include <fty_common_db_dbpath.h>
 #include <fty_log.h>
 #include <fty/string-utils.h>
-#include <functional>
-#include <iostream>
-#include <map>
-#include <memory>
-#include <openssl/sha.h>
-#include <sstream>
-#include <time.h>
-#include <utility>
-#include <uuid/uuid.h>
 #include <fty_common_agents.h>
+#include <map>
 
 #define AGENT_ASSET_ACTIVATOR "etn-licensing-credits"
 
