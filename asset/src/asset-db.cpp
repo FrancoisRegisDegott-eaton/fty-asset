@@ -8,7 +8,6 @@
 #include <fty_common_asset_types.h>
 #include <fty_common_db_connection.h>
 #include <fty_log.h>
-#include <iostream>
 #include <sys/time.h>
 
 #define MAX_CREATE_RETRY 10
@@ -502,7 +501,7 @@ Expected<Attributes> selectExtAttributes(const std::map<std::string, std::string
         }
         sql.append(filter);
     }
-    std::cout << "Sql: " << sql << std::endl;
+
     try {
         fty::db::Connection db;
         auto result = db.select(sql);

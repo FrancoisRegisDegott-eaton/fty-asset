@@ -171,6 +171,7 @@ TEST_CASE("Select asset")
 
 TEST_CASE("Select asset with filters")
 {
+    std::string uuid = "daab10f2-04ad-5cfb-ab8f-aaccf9b1bba3";
     std::string ipAddr = "10.130.33.34";
 
     fty::SampleDb db(R"(
@@ -179,6 +180,7 @@ TEST_CASE("Select asset with filters")
             name     : device
             ext-name : Device name
             attrs    :
+              uuid: daab10f2-04ad-5cfb-ab8f-aaccf9b1bba3
               ip.1: 10.130.33.34
     )");
 
@@ -187,37 +189,49 @@ TEST_CASE("Select asset with filters")
     REQUIRE(devId);
     CHECK(devId == 1);
 
-    // selectAssetElementWebById with filter
+    // selectAssetElementWebById with uuid filter
     {
-        auto res = fty::asset::db::selectExtAttributes({{"keytag", "ip.1"}, {"value", ipAddr}});;
-        if (!res) {
-            FAIL(res.error());
-        }
+      auto res = fty::asset::db::selectExtAttributes({{"keytag", "uuid"}, {"value", uuid}});;
+      if (!res) {
+          FAIL(res.error());
+      }
 
-        REQUIRE(res);
-        CHECK(res->size() == 1);
-        CHECK((*res)["ip.1"].value == ipAddr);
+      REQUIRE(res);
+      CHECK(res->size() == 1);
+      CHECK((*res)["uuid"].value == uuid);
+    }
+
+    // selectAssetElementWebById with ip filter
+    {
+      auto res = fty::asset::db::selectExtAttributes({{"keytag", "ip.1"}, {"value", ipAddr}});;
+      if (!res) {
+          FAIL(res.error());
+      }
+
+      REQUIRE(res);
+      CHECK(res->size() == 1);
+      CHECK((*res)["ip.1"].value == ipAddr);
     }
 
     // selectAssetElementWebById without filter
     {
-        auto res = fty::asset::db::selectExtAttributes({});
-        if (!res) {
-            FAIL(res.error());
-        }
+      auto res = fty::asset::db::selectExtAttributes({});
+      if (!res) {
+          FAIL(res.error());
+      }
 
-        REQUIRE(res);
-        CHECK(res->size() == 0);
+      REQUIRE(res);
+      CHECK(res->size() == 0);
     }
 
     // selectAssetElementWebById with wrong filter
     {
-        auto res = fty::asset::db::selectExtAttributes({{"keytag", "ip.1"}, {"value", "127.0.0.1"}});
-        if (!res) {
-            FAIL(res.error());
-        }
+      auto res = fty::asset::db::selectExtAttributes({{"keytag", "ip.1"}, {"value", "127.0.0.1"}});
+      if (!res) {
+          FAIL(res.error());
+      }
 
-        REQUIRE(res);
-        CHECK(res->size() == 0);
+      REQUIRE(res);
+      CHECK(res->size() == 0);
     }
 }
