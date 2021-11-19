@@ -20,8 +20,7 @@ namespace fty::asset {
 Uuid generateUUID(const AssetFilter& assetFilter)
 {
     static std::string ns = "\x93\x3d\x6c\x80\xde\xa9\x8c\x6b\xd1\x11\x8b\x3b\x46\xa1\x81\xf1";
-    // std::string uuid;
-    auto result = Uuid{};
+    Uuid result;
 
     if (!assetFilter.manufacturer.empty() && !assetFilter.model.empty() && !assetFilter.serial.empty()) {
         log_debug("generate full UUID");
@@ -42,7 +41,7 @@ Uuid generateUUID(const AssetFilter& assetFilter)
         uuid_unparse_lower(hash.data(), uuid_char);
 
         result.uuid = uuid_char;
-        result.type = UUID_TYPE_DCE_SHA1;
+        result.type = UUID_TYPE_VERSION_5;
     } else {
         log_debug("generate random UUID");
         uuid_t u;
@@ -52,7 +51,7 @@ Uuid generateUUID(const AssetFilter& assetFilter)
         uuid_unparse_lower(u, uuid_char);
 
         result.uuid = uuid_char;
-        result.type = UUID_TYPE_DCE_RANDOM;
+        result.type = UUID_TYPE_VERSION_4;
     }
 
     return result;
@@ -181,12 +180,12 @@ AssetExpected<void> tryToPlaceAsset(uint32_t id, uint32_t parentId, uint32_t siz
     return {};
 }
 
-AssetExpected<void> checkDuplicateAsset(const AssetFilter& assetFilter)
+AssetExpected<void> checkDuplicatedAsset(const AssetFilter& assetFilter)
 {
     std::map<std::string, std::string> mapFilter;
 
     auto uuidAsset = generateUUID(assetFilter);
-    if (uuidAsset.type != UUID_TYPE_DCE_RANDOM) {
+    if (uuidAsset.type == UUID_TYPE_VERSION_5) {
         mapFilter = {{"keytag", "uuid"}, {"value", uuidAsset.uuid}};
     } else {
         mapFilter = {{"keytag", "ip.1"}, {"value", assetFilter.ipAddr}};
@@ -198,10 +197,9 @@ AssetExpected<void> checkDuplicateAsset(const AssetFilter& assetFilter)
     }
     if (res->size() == 1) {
         std::string err = "Asset '{}' already exist, duplicate it is forbidden"_tr.format(uuidAsset.uuid);
-        logError("Asset '{}' already exist, duplicate it is forbidden", uuidAsset.uuid);
+        logError(err);
         return unexpected(error(Errors::ElementAlreadyExist).format(err));
     }
-
     return {};
 }
 
