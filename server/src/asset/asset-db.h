@@ -78,6 +78,7 @@ public:
 
 private:
     DB();
+    void makeName(std::string& name);
     std::mutex                m_conn_lock;
     mutable tntdb::Connection m_conn;
 };

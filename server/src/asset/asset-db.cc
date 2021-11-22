@@ -27,6 +27,7 @@
 #include <tntdb.h>
 #include <map>
 #include <algorithm>
+#include <regex>
 
 #include <cassert>
 
@@ -666,7 +667,7 @@ void DB::saveLinkedAssets(Asset& asset)
     }
 
     // add new links
-    for (const AssetLink l : asset.getLinkedAssets()) {
+    for (const AssetLink& l : asset.getLinkedAssets()) {
         // delete link from the list of links to remove
         auto found = std::find_if(toRemove.begin(), toRemove.end(), [&](const Existing& e) {
             return e.second == l;
@@ -1249,6 +1250,51 @@ std::string DB::inameByUuid(const std::string& uuid)
     return res;
 }
 
+void DB::makeName(std::string& name)
+{
+    static std::regex rex("^.*~(\\d+)$");
+
+    name = name.substr(0, 50);
+    std::string nameMask = name.substr(0, 47);
+
+    // clang-format off
+    auto q = m_conn.prepareCached(R"(
+        SELECT value
+        FROM   t_bios_asset_ext_attributes
+        WHERE
+            keytag == 'name' AND
+            value LIKE :mask
+    )");
+    // clang-format on
+
+    q.set("mask", nameMask+"*");
+    tntdb::Result res;
+
+    try {
+        Lock lock(m_conn_lock);
+        res = q.select();
+    } catch (std::exception& e) {
+        throw std::runtime_error("database error - " + std::string(e.what()));
+    }
+
+    int num = 0;
+    std::smatch match;
+    for(const auto& row: res) {
+        std::string val = row.getString("value");
+        if (std::regex_search(val, match, rex)) {
+            int tnum = fty::convert<int>(match[1].str());
+            if (tnum > num) {
+                num = tnum;
+            }
+        }
+    }
+    if (num) {
+        std::string suffix = fty::convert<std::string>(num+1);
+        name = name.substr(0, 50-1-suffix.length());
+        name = fmt::format("{}~{}", name, suffix);
+    }
+}
+
 void DB::saveExtMap(Asset& asset)
 {
     /*
@@ -1305,6 +1351,11 @@ void DB::saveExtMap(Asset& asset)
             continue;
         }
 
+        std::string value = it.second.getValue();
+        if (it.first == "name" && it.second.getValue().size() > 50) {
+            makeName(value);
+        }
+
         auto found = std::find_if(existing.begin(), existing.end(), [&](const ExternalAttributeInDB& e) {
             return std::get<1>(e) == it.first;
         });
@@ -1322,7 +1373,7 @@ void DB::saveExtMap(Asset& asset)
                 )");
                 // clang-format on
                 q1.set("key", it.first);
-                q1.set("value", it.second.getValue());
+                q1.set("value", value);
                 q1.set("readOnly", it.second.isReadOnly());
                 q1.set("assetId", *assetID);
                 try {
@@ -1349,7 +1400,7 @@ void DB::saveExtMap(Asset& asset)
                     WHERE id_asset_ext_attribute = :extId
                 )");
                 // clang-format on
-                q1.set("value", it.second.getValue());
+                q1.set("value", value);
                 q1.set("readOnly", it.second.isReadOnly());
                 q1.set("extId", std::get<0>(*found));
 
