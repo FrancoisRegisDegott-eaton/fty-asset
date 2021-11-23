@@ -13,7 +13,7 @@ TEST_CASE("Long names / simple")
         )");
 
     {
-        auto res = fty::asset::normName("Long Long Long name Long name Long name device name");
+        auto res = fty::asset::normName("Long Long Long name Long name Long name device name", 50);
         REQUIRE(res);
         CHECK(*res == "Long Long Long name Long name Long name device nam");
     }
@@ -35,7 +35,7 @@ TEST_CASE("Long names / already exists")
         )");
 
     {
-        auto res = fty::asset::normName("Long Long Long name Long name Long name device name");
+        auto res = fty::asset::normName("Long Long Long name Long name Long name device name", 50);
         REQUIRE(res);
         CHECK(*res == "Long Long Long name Long name Long name device n~1");
     }
@@ -60,7 +60,7 @@ TEST_CASE("Long names / already exists 2")
         )");
 
     {
-        auto res = fty::asset::normName("Long Long Long name Long name Long name device name");
+        auto res = fty::asset::normName("Long Long Long name Long name Long name device name", 50);
         REQUIRE(res);
         CHECK(*res == "Long Long Long name Long name Long name device n~2");
     }
@@ -85,7 +85,7 @@ TEST_CASE("Long names / already exists 3")
         )");
 
     {
-        auto res = fty::asset::normName("Long Long Long name Long name Long name device name");
+        auto res = fty::asset::normName("Long Long Long name Long name Long name device name", 50);
         REQUIRE(res);
         CHECK(*res == "Long Long Long name Long name Long name device ~11");
     }

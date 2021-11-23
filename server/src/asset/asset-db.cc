@@ -1308,7 +1308,7 @@ void DB::saveExtMap(Asset& asset)
 
         std::string value = it.second.getValue();
         if (it.first == "name" && it.second.getValue().size() > 50) {
-            if (auto norm = fty::asset::normName(value)) {
+            if (auto norm = fty::asset::normName(value, 50, *assetID)) {
                 value = *norm;
             } else {
                 logError("Cannot norm name: {}", norm.error());

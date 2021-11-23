@@ -203,44 +203,59 @@ AssetExpected<void> activation::deactivate(const FullAsset& asset)
     return deactivate(asset.toJson());
 }
 
-AssetExpected<std::string> normName(const std::string& origName, int32_t assetId)
+AssetExpected<std::string> normName(const std::string& origName, uint32_t maxLen, uint32_t assetId)
 {
-    assert(origName.size() > 50);
-    static std::regex rex("^.*~(\\d+)$");
+    if (origName.length() < maxLen) {
+        return origName;
+    }
 
+    static std::regex  rex("^.*~(\\d+)$");
     static std::string sql = R"(
         SELECT value
         FROM   t_bios_asset_ext_attributes
         WHERE
-            keytag = 'name' AND
-            value LIKE :mask AND
-            id_asset_element != : assetId
+            keytag = 'name'
+            AND (
+                value = :name OR
+                value LIKE :mask1 OR
+                value LIKE :mask2
+            )
+            AND id_asset_element != : assetId
     )";
 
-    std::string name     = origName.substr(0, 50);
-    std::string nameMask = origName.substr(0, 47);
-
+    std::string name = origName.substr(0, maxLen);
 
     try {
         fty::db::Connection conn;
-        auto rows = conn.select(sql, "mask"_p = nameMask + "%", "assetId"_p = assetId);
+
+        // clang-format off
+        auto rows = conn.select(sql,
+            "name"_p    = name,
+            "mask1"_p   = name.substr(0, maxLen-2) + "~%",
+            "mask2"_p   = name.substr(0, maxLen-3) + "~%",
+            "assetId"_p = assetId
+        );
+        // clang-format on
 
         int         num = -1;
         std::smatch match;
         for (const auto& row : rows) {
-            num = 0;
             std::string val = row.get("value");
             if (std::regex_search(val, match, rex)) {
                 int tnum = fty::convert<int>(match[1].str());
                 if (tnum > num) {
                     num = tnum;
                 }
+            } else if (num == -1) {
+                num = 0;
             }
         }
+
         if (num != -1) {
             std::string suffix = fty::convert<std::string>(num + 1);
-            name               = name.substr(0, 50 - 1 - suffix.length());
-            name               = fmt::format("{}~{}", name, suffix);
+
+            name = origName.substr(0, maxLen - 1 - suffix.length());
+            name = fmt::format("{}~{}", name, suffix);
         }
     } catch (const std::exception& ex) {
         logError(ex.what());
