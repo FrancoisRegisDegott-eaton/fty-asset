@@ -3,8 +3,10 @@
 #include <ctime>
 #include <fty_asset_dto.h>
 #include <fty_common_agents.h>
+#include <fty_common_db_connection.h>
 #include <fty_common_mlm.h>
 #include <openssl/sha.h>
+#include <regex>
 #include <sstream>
 #include <time.h>
 #include <utility>
@@ -20,7 +22,7 @@ namespace fty::asset {
 Uuid generateUUID(const AssetFilter& assetFilter)
 {
     static std::string ns = "\x93\x3d\x6c\x80\xde\xa9\x8c\x6b\xd1\x11\x8b\x3b\x46\xa1\x81\xf1";
-    Uuid result;
+    Uuid               result;
 
     if (!assetFilter.manufacturer.empty() && !assetFilter.model.empty() && !assetFilter.serial.empty()) {
         log_debug("generate full UUID");
@@ -267,6 +269,67 @@ AssetExpected<void> activation::deactivate(const std::string& asset)
 AssetExpected<void> activation::deactivate(const FullAsset& asset)
 {
     return deactivate(asset.toJson());
+}
+
+AssetExpected<std::string> normName(const std::string& origName, uint32_t maxLen, uint32_t assetId)
+{
+    if (origName.length() < maxLen) {
+        return origName;
+    }
+
+    static std::regex  rex("^.*~(\\d+)$");
+    static std::string sql = R"(
+        SELECT value
+        FROM   t_bios_asset_ext_attributes
+        WHERE
+            keytag = 'name'
+            AND (
+                value = :name OR
+                value LIKE :mask1 OR
+                value LIKE :mask2
+            )
+            AND id_asset_element != : assetId
+    )";
+
+    std::string name = origName.substr(0, maxLen);
+
+    try {
+        fty::db::Connection conn;
+
+        // clang-format off
+        auto rows = conn.select(sql,
+            "name"_p    = name,
+            "mask1"_p   = name.substr(0, maxLen-2) + "~%",
+            "mask2"_p   = name.substr(0, maxLen-3) + "~%",
+            "assetId"_p = assetId
+        );
+        // clang-format on
+
+        int         num = -1;
+        std::smatch match;
+        for (const auto& row : rows) {
+            std::string val = row.get("value");
+            if (std::regex_search(val, match, rex)) {
+                int tnum = fty::convert<int>(match[1].str());
+                if (tnum > num) {
+                    num = tnum;
+                }
+            } else if (num == -1) {
+                num = 0;
+            }
+        }
+
+        if (num != -1) {
+            std::string suffix = fty::convert<std::string>(num + 1);
+
+            name = origName.substr(0, maxLen - 1 - suffix.length());
+            name = fmt::format("{}~{}", name, suffix);
+        }
+    } catch (const std::exception& ex) {
+        logError(ex.what());
+        return fty::unexpected("Exception: {}", ex.what());
+    }
+    return name;
 }
 
 } // namespace fty::asset

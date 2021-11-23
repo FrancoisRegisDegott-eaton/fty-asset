@@ -27,6 +27,7 @@
 #include <tntdb.h>
 #include <map>
 #include <algorithm>
+#include <asset/asset-helpers.h>
 
 #include <cassert>
 
@@ -666,7 +667,7 @@ void DB::saveLinkedAssets(Asset& asset)
     }
 
     // add new links
-    for (const AssetLink l : asset.getLinkedAssets()) {
+    for (const AssetLink& l : asset.getLinkedAssets()) {
         // delete link from the list of links to remove
         auto found = std::find_if(toRemove.begin(), toRemove.end(), [&](const Existing& e) {
             return e.second == l;
@@ -1305,6 +1306,16 @@ void DB::saveExtMap(Asset& asset)
             continue;
         }
 
+        std::string value = it.second.getValue();
+        if (it.first == "name" && it.second.getValue().size() > 50) {
+            if (auto norm = fty::asset::normName(value, 50, *assetID)) {
+                value = *norm;
+            } else {
+                logError("Cannot norm name: {}", norm.error());
+                throw std::runtime_error("Cannot norm name - " + norm.error());
+            }
+        }
+
         auto found = std::find_if(existing.begin(), existing.end(), [&](const ExternalAttributeInDB& e) {
             return std::get<1>(e) == it.first;
         });
@@ -1322,7 +1333,7 @@ void DB::saveExtMap(Asset& asset)
                 )");
                 // clang-format on
                 q1.set("key", it.first);
-                q1.set("value", it.second.getValue());
+                q1.set("value", value);
                 q1.set("readOnly", it.second.isReadOnly());
                 q1.set("assetId", *assetID);
                 try {
@@ -1349,7 +1360,7 @@ void DB::saveExtMap(Asset& asset)
                     WHERE id_asset_ext_attribute = :extId
                 )");
                 // clang-format on
-                q1.set("value", it.second.getValue());
+                q1.set("value", value);
                 q1.set("readOnly", it.second.isReadOnly());
                 q1.set("extId", std::get<0>(*found));
 

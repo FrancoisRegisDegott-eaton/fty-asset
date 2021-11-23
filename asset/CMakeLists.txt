@@ -126,6 +126,7 @@ etn_test_target(fty-asset-libng
         test/export.cpp
         test/delete.cpp
         test/usize.cpp
+        test/norm-name.cpp
 
         test/db2/misc.cpp
         test/db2/select.cpp
