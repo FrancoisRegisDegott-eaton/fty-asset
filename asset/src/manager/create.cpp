@@ -86,9 +86,23 @@ AssetExpected<uint32_t> AssetManager::importAsset(
         logError("key 'id' is forbidden to be used");
         return unexpected(msg.format(itemName, "key 'id' is forbidden to be used"_tr));
     }
+    // If descriminant are available, check to not duplicate asset.
+    if (cm.hasTitle("manufacturer") && cm.hasTitle("model") && cm.hasTitle("serial_no")) {
+      logDebug("All discriminant data are available, checking to not duplicate asset");
+
+      std::string ipAddr = cm.hasTitle("ip.1") ? cm.get(1, "ip.1") : "";
+      AssetFilter assetFilter{cm.get(1, "manufacturer"), cm.get(1, "model"), cm.get(1, "serial_no"), ipAddr};
+
+      auto ret = checkDuplicatedAsset(assetFilter);
+      if (!ret) {
+        return unexpected(msg.format(itemName, ret.error()));
+      }
+    }
+    else {
+      logError("Discriminant data are not availables, can not check duplicated asset");
+    }
 
     if (sendNotify) {
-
         try {
             FullAsset asset(si);
             if (auto ret = activation::isActivable(asset)) {
@@ -149,7 +163,7 @@ AssetExpected<uint32_t> AssetManager::importAsset(
                     auto credentialList = getCredentialMappings(map);
                     createMappings(assetIname, credentialList);
                 } catch (const std::exception& e) {
-                    log_error("Failed to update CAM: %s", e.what());
+                    logError("Failed to update CAM: {}", e.what());
                 }
             }
             return imported.at(1)->id;
