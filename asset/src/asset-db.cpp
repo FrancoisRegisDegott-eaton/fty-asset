@@ -8,6 +8,7 @@
 #include <fty_common_asset_types.h>
 #include <fty_common_db_connection.h>
 #include <fty_log.h>
+#include <iostream>
 #include <sys/time.h>
 
 #define MAX_CREATE_RETRY 10
@@ -459,7 +460,6 @@ Expected<Attributes> selectExtAttributes(uint32_t elementId)
         auto result = db.select(sql, "elementId"_p = elementId);
 
         Attributes attrs;
-
         for (const auto& row : result) {
             ExtAttrValue val;
 
@@ -472,6 +472,48 @@ Expected<Attributes> selectExtAttributes(uint32_t elementId)
         return std::move(attrs);
     } catch (const std::exception& e) {
         return unexpected(error(Errors::ExceptionForElement).format(e.what(), elementId));
+    }
+}
+
+// =====================================================================================================================
+
+Expected<Attributes> selectExtAttributes(const std::map<std::string, std::string>& filters)
+{
+    std::string sql = R"(
+        SELECT
+            v.keytag,
+            v.value,
+            v.read_only
+        FROM
+            v_bios_asset_ext_attributes v
+        )";
+
+    if (filters.size() > 0) {
+        std::vector<std::string> filter;
+        for (const auto& [key, value] : filters) {
+            filter.push_back(fmt::format("v.{} = '{}'", key, value));
+        }
+        sql.append("WHERE \n");
+        sql.append(implode(filter, " and "));
+    }
+
+    try {
+        fty::db::Connection db;
+        auto result = db.select(sql);
+
+        Attributes attrs;
+        for (const auto& row : result) {
+            ExtAttrValue val;
+
+            row.get("value", val.value);
+            row.get("read_only", val.readOnly);
+
+            attrs.emplace(row.get("keytag"), val);
+        }
+
+        return std::move(attrs);
+    } catch (const std::exception& e) {
+        return unexpected(error(Errors::ExceptionForElement).format(e.what()));
     }
 }
 

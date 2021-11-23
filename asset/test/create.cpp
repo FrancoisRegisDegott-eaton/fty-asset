@@ -240,6 +240,45 @@ TEST_CASE("Create asset with SerializationInfo embeding ips member and ip.1 exte
     auto ret = fty::asset::AssetManager::createAsset(si, "dummy", false);
     REQUIRE_EXP(ret);
     CHECK(*ret > 0);
-  
+
+    CHECK(fty::asset::AssetManager::deleteAsset(*ret, false));
+}
+
+TEST_CASE("Create asset and check IP")
+{
+    fty::SampleDb db(R"(
+        items:
+            - type     : Datacenter
+              name     : datacenter
+              ext-name : DC0
+              attrs    :
+                ip.1: 10.130.33.34
+        )");
+
+    static std::string json = R"({
+        "type": "device",
+        "status": "nonactive",
+        "sub_type": "epdu",
+        "name": "EATON EPDU MA 0U (309 32A 3P)18XC13:6XC19 H742H…",
+        "priority": "P3",
+        "location": "DC0",
+        "ips": ["10.130.33.191"],
+        "type" : "ups",
+        "ext": [
+            {"asset_tag": "", "read_only": false},
+            {"contact_name": "", "read_only": false},
+            {"contact_email": "", "read_only": false},
+            {"contact_phone": "", "read_only": false},
+            {"description": "", "read_only": false},
+            {"create_mode": "", "read_only": false},
+            {"update_ts": "", "read_only": false},
+            {"ip.1": "10.130.33.191", "read_only": false}
+        ]
+    })";
+
+    auto ret = fty::asset::AssetManager::createAsset(json, "dummy", false);
+    REQUIRE_EXP(ret);
+    CHECK(*ret > 0);
+
     CHECK(fty::asset::AssetManager::deleteAsset(*ret, false));
 }

@@ -23,6 +23,7 @@ etn_target(exe ${PROJECT_NAME}-server
         fty_common
     USES_PRIVATE
         ${PROJECT_NAME}
+        ${PROJECT_NAME}-libng
         cxxtools
         fty_common
         fty_common_db
@@ -37,9 +38,7 @@ etn_target(exe ${PROJECT_NAME}-server
         tntdb
         czmq
         mlm
-        crypto
         protobuf
-        uuid
 )
 
 #install stystemd config
@@ -54,4 +53,3 @@ install(FILES
 
 
 ##############################################################################################################
-

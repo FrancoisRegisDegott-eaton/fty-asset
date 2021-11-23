@@ -3,7 +3,14 @@
 #include <ctime>
 #include <fty_asset_dto.h>
 #include <fty_common_agents.h>
+#include <fty_common_db_connection.h>
 #include <fty_common_mlm.h>
+#include <openssl/sha.h>
+#include <regex>
+#include <sstream>
+#include <time.h>
+#include <utility>
+#include <uuid/uuid.h>
 
 #define AGENT_ASSET_ACTIVATOR      "etn-licensing-credits"
 #define COMMAND_IS_ASSET_ACTIVABLE "GET_IS_ASSET_ACTIVABLE"
@@ -11,6 +18,46 @@
 #define COMMAND_DEACTIVATE_ASSET   "DEACTIVATE_ASSET"
 
 namespace fty::asset {
+
+Uuid generateUUID(const AssetFilter& assetFilter)
+{
+    static std::string ns = "\x93\x3d\x6c\x80\xde\xa9\x8c\x6b\xd1\x11\x8b\x3b\x46\xa1\x81\xf1";
+    Uuid               result;
+
+    if (!assetFilter.manufacturer.empty() && !assetFilter.model.empty() && !assetFilter.serial.empty()) {
+        log_debug("generate full UUID");
+
+        std::string src = ns + assetFilter.manufacturer + assetFilter.model + assetFilter.serial;
+        // hash must be zeroed first
+        std::array<unsigned char, SHA_DIGEST_LENGTH> hash;
+        hash.fill(0);
+
+        SHA1(reinterpret_cast<const unsigned char*>(src.c_str()), src.length(), hash.data());
+
+        hash[6] &= 0x0F;
+        hash[6] |= 0x50;
+        hash[8] &= 0x3F;
+        hash[8] |= 0x80;
+
+        char uuid_char[37];
+        uuid_unparse_lower(hash.data(), uuid_char);
+
+        result.uuid = uuid_char;
+        result.type = UUID_TYPE_VERSION_5;
+    } else {
+        log_debug("generate random UUID");
+        uuid_t u;
+        uuid_generate_random(u);
+
+        char uuid_char[37];
+        uuid_unparse_lower(u, uuid_char);
+
+        result.uuid = uuid_char;
+        result.type = UUID_TYPE_VERSION_4;
+    }
+
+    return result;
+}
 
 AssetExpected<uint32_t> checkElementIdentifier(const std::string& paramName, const std::string& paramValue)
 {
@@ -135,6 +182,29 @@ AssetExpected<void> tryToPlaceAsset(uint32_t id, uint32_t parentId, uint32_t siz
     return {};
 }
 
+AssetExpected<void> checkDuplicatedAsset(const AssetFilter& assetFilter)
+{
+    std::map<std::string, std::string> mapFilter;
+
+    auto uuidAsset = generateUUID(assetFilter);
+    if (uuidAsset.type == UUID_TYPE_VERSION_5) {
+        mapFilter = {{"keytag", "uuid"}, {"value", uuidAsset.uuid}};
+    } else {
+        mapFilter = {{"keytag", "ip.1"}, {"value", assetFilter.ipAddr}};
+    }
+
+    auto res = fty::asset::db::selectExtAttributes(mapFilter);
+    if (!res) {
+        return unexpected("Select data base failed"_tr);
+    }
+    if (res->size() == 1) {
+        std::string err = "Asset '{}' already exist, duplicate it is forbidden"_tr.format(uuidAsset.uuid);
+        logError(err);
+        return unexpected(error(Errors::ElementAlreadyExist).format(err));
+    }
+    return {};
+}
+
 static AssetExpected<std::vector<std::string>> activateRequest(const std::string& command, const std::string& asset)
 {
     try {
@@ -199,6 +269,67 @@ AssetExpected<void> activation::deactivate(const std::string& asset)
 AssetExpected<void> activation::deactivate(const FullAsset& asset)
 {
     return deactivate(asset.toJson());
+}
+
+AssetExpected<std::string> normName(const std::string& origName, uint32_t maxLen, uint32_t assetId)
+{
+    if (origName.length() < maxLen) {
+        return origName;
+    }
+
+    static std::regex  rex("^.*~(\\d+)$");
+    static std::string sql = R"(
+        SELECT value
+        FROM   t_bios_asset_ext_attributes
+        WHERE
+            keytag = 'name'
+            AND (
+                value = :name OR
+                value LIKE :mask1 OR
+                value LIKE :mask2
+            )
+            AND id_asset_element != : assetId
+    )";
+
+    std::string name = origName.substr(0, maxLen);
+
+    try {
+        fty::db::Connection conn;
+
+        // clang-format off
+        auto rows = conn.select(sql,
+            "name"_p    = name,
+            "mask1"_p   = name.substr(0, maxLen-2) + "~%",
+            "mask2"_p   = name.substr(0, maxLen-3) + "~%",
+            "assetId"_p = assetId
+        );
+        // clang-format on
+
+        int         num = -1;
+        std::smatch match;
+        for (const auto& row : rows) {
+            std::string val = row.get("value");
+            if (std::regex_search(val, match, rex)) {
+                int tnum = fty::convert<int>(match[1].str());
+                if (tnum > num) {
+                    num = tnum;
+                }
+            } else if (num == -1) {
+                num = 0;
+            }
+        }
+
+        if (num != -1) {
+            std::string suffix = fty::convert<std::string>(num + 1);
+
+            name = origName.substr(0, maxLen - 1 - suffix.length());
+            name = fmt::format("{}~{}", name, suffix);
+        }
+    } catch (const std::exception& ex) {
+        logError(ex.what());
+        return fty::unexpected("Exception: {}", ex.what());
+    }
+    return name;
 }
 
 } // namespace fty::asset
