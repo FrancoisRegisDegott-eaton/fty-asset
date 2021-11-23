@@ -926,7 +926,7 @@ cxxtools::SerializationInfo AssetServer::saveAssets(bool saveVirtualAssets)
 
     cxxtools::SerializationInfo& data = si.addMember("data");
 
-    for (const std::string assetName : assets) {
+    for (const std::string& assetName : assets) {
         AssetImpl a(assetName);
 
         if (a.isVirtual() && !saveVirtualAssets) {
