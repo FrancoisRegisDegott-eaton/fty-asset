@@ -23,4 +23,6 @@ namespace activation {
     AssetExpected<void> deactivate(const std::string& assetJson);
 } // namespace activation
 
+AssetExpected<std::string> normName(const std::string& name, int32_t assetId = -1);
+
 } // namespace fty::asset

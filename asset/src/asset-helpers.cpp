@@ -3,7 +3,9 @@
 #include <ctime>
 #include <fty_asset_dto.h>
 #include <fty_common_agents.h>
+#include <fty_common_db_connection.h>
 #include <fty_common_mlm.h>
+#include <regex>
 
 #define AGENT_ASSET_ACTIVATOR      "etn-licensing-credits"
 #define COMMAND_IS_ASSET_ACTIVABLE "GET_IS_ASSET_ACTIVABLE"
@@ -199,6 +201,52 @@ AssetExpected<void> activation::deactivate(const std::string& asset)
 AssetExpected<void> activation::deactivate(const FullAsset& asset)
 {
     return deactivate(asset.toJson());
+}
+
+AssetExpected<std::string> normName(const std::string& origName, int32_t assetId)
+{
+    assert(origName.size() > 50);
+    static std::regex rex("^.*~(\\d+)$");
+
+    static std::string sql = R"(
+        SELECT value
+        FROM   t_bios_asset_ext_attributes
+        WHERE
+            keytag = 'name' AND
+            value LIKE :mask AND
+            id_asset_element != : assetId
+    )";
+
+    std::string name     = origName.substr(0, 50);
+    std::string nameMask = origName.substr(0, 47);
+
+
+    try {
+        fty::db::Connection conn;
+        auto rows = conn.select(sql, "mask"_p = nameMask + "%", "assetId"_p = assetId);
+
+        int         num = -1;
+        std::smatch match;
+        for (const auto& row : rows) {
+            num = 0;
+            std::string val = row.get("value");
+            if (std::regex_search(val, match, rex)) {
+                int tnum = fty::convert<int>(match[1].str());
+                if (tnum > num) {
+                    num = tnum;
+                }
+            }
+        }
+        if (num != -1) {
+            std::string suffix = fty::convert<std::string>(num + 1);
+            name               = name.substr(0, 50 - 1 - suffix.length());
+            name               = fmt::format("{}~{}", name, suffix);
+        }
+    } catch (const std::exception& ex) {
+        logError(ex.what());
+        return fty::unexpected("Exception: {}", ex.what());
+    }
+    return name;
 }
 
 } // namespace fty::asset
