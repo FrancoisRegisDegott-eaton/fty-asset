@@ -132,6 +132,9 @@ static void fetchWebAsset(const fty::db::Row& row, WebAssetElement& asset)
     row.get("status", asset.status);
     row.get("priority", asset.priority);
     row.get("assetTag", asset.assetTag);
+
+    // dirty fix for subtype name
+    asset.subtypeName = persist::subtypeid_to_subtype(asset.subtypeId);
 }
 
 // =====================================================================================================================
