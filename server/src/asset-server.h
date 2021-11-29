@@ -62,7 +62,7 @@ static constexpr const char* METADATA_ID_ONLY           = "ID_ONLY";
 static constexpr const char* METADATA_WITH_PARENTS_LIST = "WITH_PARENTS_LIST";
 
 // SRR
-static constexpr const char* SRR_ACTIVE_VERSION  = "1.0";
+static constexpr const char* SRR_ACTIVE_VERSION  = "1.1";
 static constexpr const char* FTY_ASSET_SRR_AGENT = "asset-agent-srr";
 static constexpr const char* FTY_ASSET_SRR_NAME  = "asset-agent";
 static constexpr const char* FTY_ASSET_SRR_QUEUE = "FTY.Q.ASSET.SRR";
