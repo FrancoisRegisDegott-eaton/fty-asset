@@ -236,23 +236,23 @@ static void process_powers_key(
             throw std::invalid_argument(TRANSLATE_ME("Key 'src_name' in the key 'powers' is mandatory"));
         }
 
-        std::string src_name;
+        cxxtools::String src_name;
         oneElement.getMember("src_name") >>= src_name;
         data[0].push_back("power_source." + std::to_string(i));
-        data[1].push_back(src_name);
+        data[1].push_back(cxxtools::Utf8Codec::encode(src_name));
         // src_outlet is optimal
         if (oneElement.findMember("src_socket") != nullptr) {
-            std::string src_socket{};
+            cxxtools::String src_socket;
             oneElement.getMember("src_socket") >>= src_socket;
             data[0].push_back("power_plug_src." + std::to_string(i));
-            data[1].push_back(src_socket);
+            data[1].push_back(cxxtools::Utf8Codec::encode(src_socket));
         }
         // dest_outlet is optional
         if (oneElement.findMember("dest_socket") != nullptr) {
-            std::string dest_socket;
+            cxxtools::String dest_socket;
             oneElement.getMember("dest_socket") >>= dest_socket;
             data[0].push_back("power_input." + std::to_string(i));
-            data[1].push_back(dest_socket);
+            data[1].push_back(cxxtools::Utf8Codec::encode(dest_socket));
         }
         // src_id is there, but here it is ignored
         // because id and name can be in the conflict.
@@ -276,10 +276,10 @@ static void process_groups_key(
         if (oneElement.findMember("name") == nullptr) {
             throw std::invalid_argument(TRANSLATE_ME("Key 'name' in the key 'groups' is mandatory"));
         } else {
-            std::string group_name;
+            cxxtools::String group_name;
             oneElement.getMember("name") >>= group_name;
             data[0].push_back("group." + std::to_string(i));
-            data[1].push_back(group_name);
+            data[1].push_back(cxxtools::Utf8Codec::encode(group_name));
         }
         i++;
     }
@@ -303,10 +303,10 @@ static void process_ips_key(const cxxtools::SerializationInfo& si, std::vector<s
             continue;
         }
 
-        std::string value;
+        cxxtools::String value;
         oneElement.getValue(value);
         data[0].push_back(name);
-        data[1].push_back(value);
+        data[1].push_back(cxxtools::Utf8Codec::encode(value));
     }
 }
 
@@ -320,10 +320,10 @@ static void process_macs_key(const cxxtools::SerializationInfo& si, std::vector<
     // we need a counter for fields
     int i = 1;
     for (const auto& oneElement : si) { // iterate through the array
-        std::string value;
+        cxxtools::String value;
         oneElement.getValue(value);
         data[0].push_back("mac." + std::to_string(i));
-        data[1].push_back(value);
+        data[1].push_back(cxxtools::Utf8Codec::encode(value));
         i++;
     }
 }
@@ -338,10 +338,10 @@ static void process_hostnames_key(const cxxtools::SerializationInfo& si, std::ve
     // we need a counter for fields
     int i = 1;
     for (const auto& oneElement : si) { // iterate through the array
-        std::string value;
+        cxxtools::String value;
         oneElement.getValue(value);
         data[0].push_back("hostname." + std::to_string(i));
-        data[1].push_back(value);
+        data[1].push_back(cxxtools::Utf8Codec::encode(value));
         i++;
     }
 }
@@ -356,10 +356,10 @@ static void process_fqdns_key(const cxxtools::SerializationInfo& si, std::vector
     // we need a counter for fields
     int i = 1;
     for (const auto& oneElement : si) { // iterate through the array
-        std::string value;
+        cxxtools::String value;
         oneElement.getValue(value);
         data[0].push_back("fqdn." + std::to_string(i));
-        data[1].push_back(value);
+        data[1].push_back(cxxtools::Utf8Codec::encode(value));
         i++;
     }
 }
@@ -370,8 +370,8 @@ static void process_oneOutlet(const cxxtools::SerializationInfo& outlet_si, std:
         std::string msg = TRANSLATE_ME("Key '%s' should be an array", outlet_si.name().c_str());
         throw std::invalid_argument(msg);
     }
-    std::string name;
-    std::string value;
+    cxxtools::String name;
+    cxxtools::String value;
     bool        isReadOnly = false;
     for (const auto& oneOutletAttr : outlet_si) { // iterate through the outletAttributes
         try {
@@ -381,8 +381,8 @@ static void process_oneOutlet(const cxxtools::SerializationInfo& outlet_si, std:
         } catch (...) {
             throw std::invalid_argument(TRANSLATE_ME("In outlet object key 'name/value/read_only' is missing"));
         }
-        data[0].push_back("outlet." + outlet_si.name() + "." + name);
-        data[1].push_back(value);
+        data[0].push_back("outlet." + outlet_si.name() + "." + cxxtools::Utf8Codec::encode(name));
+        data[1].push_back(cxxtools::Utf8Codec::encode(value));
     }
 }
 
