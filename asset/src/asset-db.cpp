@@ -273,11 +273,6 @@ Expected<uint32_t> extNameToAssetId(const std::string& assetExtName)
 
 // =====================================================================================================================
 
-static bool isOkName(const std::string& name)
-{
-    return name.find("%") != std::string::npos && name.find("@") != std::string::npos;
-}
-
 Expected<AssetElement> selectAssetElementByName(const std::string& elementName, bool extNameOnly)
 {
     static const std::string nameSql = R"(
@@ -300,10 +295,6 @@ Expected<AssetElement> selectAssetElementByName(const std::string& elementName, 
             ext.keytag = 'name' AND ext.value = :name
     )";
 
-    if (!isOkName(elementName)) {
-        return unexpected("name is not valid"_tr);
-    }
-
     try {
         fty::db::Connection db;
         fty::db::Row        row;
@@ -312,6 +303,9 @@ Expected<AssetElement> selectAssetElementByName(const std::string& elementName, 
             row = db.selectRow(extNameSql, "name"_p = elementName);
         } else {
             try {
+                if (!persist::is_ok_name(elementName.c_str())) {
+                    return unexpected("name is not valid"_tr);
+                }
                 row = db.selectRow(nameSql, "name"_p = elementName);
             } catch (const fty::db::NotFound&) {
                 row = db.selectRow(extNameSql, "name"_p = elementName);
