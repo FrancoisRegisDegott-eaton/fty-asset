@@ -295,10 +295,6 @@ Expected<AssetElement> selectAssetElementByName(const std::string& elementName, 
             ext.keytag = 'name' AND ext.value = :name
     )";
 
-    if (!persist::is_ok_name(elementName.c_str())) {
-        return unexpected("name is not valid"_tr);
-    }
-
     try {
         fty::db::Connection db;
         fty::db::Row        row;
@@ -307,8 +303,11 @@ Expected<AssetElement> selectAssetElementByName(const std::string& elementName, 
             row = db.selectRow(extNameSql, "name"_p = elementName);
         } else {
             try {
+                if (!persist::is_ok_name(elementName.c_str())) {
+                    throw std::runtime_error("name is not valid"_tr);
+                }
                 row = db.selectRow(nameSql, "name"_p = elementName);
-            } catch (const fty::db::NotFound&) {
+            } catch (const std::exception&) {
                 row = db.selectRow(extNameSql, "name"_p = elementName);
             }
         }
