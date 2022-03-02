@@ -660,6 +660,7 @@ static void s_handle_subject_assets(const fty::AssetServer& server, zmsg_t* msg)
         return;
     }
     zstr_free(&c_command);
+
     char* uuid = zmsg_popstr(msg);
 
     std::set<std::string> filters;
@@ -668,6 +669,7 @@ static void s_handle_subject_assets(const fty::AssetServer& server, zmsg_t* msg)
         filters.insert(filter);
         zstr_free(&filter);
     }
+
     std::vector<std::string> assets;
     int                      rv = 0;
 
@@ -731,8 +733,28 @@ static zmsg_t* s_publish_create_or_update_asset_msg(const std::string& client_na
 
         // additional aux items (requiered by uptime)
         if (streq(persist::typeid_to_type(static_cast<uint16_t>(foo_i)).c_str(), "datacenter")) {
-            if (!DBUptime::get_dc_upses(asset_name.c_str(), aux))
+#if 0 // original 2.4.0 (memleaks, get_dc_upses() insert strdup'ed items)
+            if (!DBUptime::get_dc_upses(asset_name.c_str(), aux)) {
                 log_error("Cannot read upses for dc with id = %s", asset_name.c_str());
+            }
+#else // no memleaks (use a non autofree interm. zhash on get_dc_upses() call)
+            zhash_t* upses = zhash_new();
+            if (!DBUptime::get_dc_upses(asset_name.c_str(), upses)) {
+                log_error("Cannot read upses for dc with id = %s", asset_name.c_str());
+            }
+            else {
+                zlist_t *keys = zhash_keys(upses);
+                for (void* it = zlist_first(keys); it; it = zlist_next(keys)) {
+                    const char* key = static_cast<const char*>(it);
+                    zhash_freefn(upses, key, free); // to free strdup'ed item
+                    zhash_insert(aux, key, zhash_lookup(upses, key)); // aux insert (strdup)
+                    //const char* value = static_cast<const char*>(zhash_lookup(upses, key));
+                    //log_trace("after get_dc_upses(), aux insert (%s, %s)", key, value);
+                }
+                zlist_destroy(&keys);
+            }
+            zhash_destroy(&upses);
+#endif
         }
         foo_i = 0;
         row["subtype_id"].get(foo_i);
@@ -879,6 +901,7 @@ void send_create_or_update_asset(
         log_info("%s:\tmlm_client_send not sending message for asset '%s'", server.getAgentName().c_str(),
             asset_name.c_str());
     }
+    zmsg_destroy(&msg);
 }
 
 static void s_sendto_create_or_update_asset(const fty::AssetServer& server, const std::string& asset_name,
