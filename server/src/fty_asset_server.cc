@@ -1673,6 +1673,12 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_addstr(msg, "$all");
         [[maybe_unused]] int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
         assert (rv == 0);
+        zmsg_t* reply = mlm_client_recv(ui);
+        assert(reply);
+        char* result = zmsg_popstr(reply);
+        assert(result && streq(result, "DONE"));
+        zmsg_destroy(&reply);
+        zstr_free(&result);
         zclock_sleep(200);
         log_info("fty-asset-server-test:Test #8: OK");
     }
@@ -1721,6 +1727,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_destroy(&reply);
         log_info("fty-asset-server-test:Test #10: OK");
     }
+
     zactor_t* autoupdate_server = zactor_new(fty_asset_autoupdate_server, static_cast<void*>( const_cast<char*>("asset-autoupdate-test")));
     zstr_sendx(autoupdate_server, "CONNECT", endpoint.c_str(), NULL);
     zsock_wait(autoupdate_server);

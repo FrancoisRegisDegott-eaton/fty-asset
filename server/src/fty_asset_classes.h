@@ -135,8 +135,4 @@ typedef struct _asset_asset_db_test_t asset_asset_db_test_t;
 //  *** To avoid double-definitions, only define if building without draft ***
 #ifndef FTY_ASSET_BUILD_DRAFT_API
 
-//  Self test for private classes
- void
-    fty_asset_private_selftest (bool verbose, const char *subtest);
-
 #endif // FTY_ASSET_BUILD_DRAFT_API
