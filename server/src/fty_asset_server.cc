@@ -527,49 +527,50 @@ static void s_handle_subject_assets_in_container(const fty::AssetServer& server,
         return;
     }
 
-    char*   c_command = zmsg_popstr(msg);
-    zmsg_t* reply     = zmsg_new();
+    zmsg_t* reply = zmsg_new();
 
-    if (!streq(c_command, "GET")) {
-        log_error("%s:\tASSETS_IN_CONTAINER: bad command '%s', expected GET", client_name.c_str(), c_command);
-        zmsg_addstr(reply, "ERROR");
-        zmsg_addstr(reply, "BAD_COMMAND");
-    }
-    zstr_free(&c_command);
-
-    std::string container_name;
-    char*       c_container_name = zmsg_popstr(msg);
-    container_name               = c_container_name ? c_container_name : "";
-    zstr_free(&c_container_name);
-
-    std::set<std::string> filters;
-    while (zmsg_size(msg) > 0) {
-        char* filter = zmsg_popstr(msg);
-        filters.insert(filter);
-        zstr_free(&filter);
+    {
+        char* c_command = zmsg_popstr(msg);
+        if (!streq(c_command, "GET")) {
+            log_error("%s:\tASSETS_IN_CONTAINER: bad command '%s', expected GET", client_name.c_str(), c_command);
+            zmsg_addstr(reply, "ERROR");
+            zmsg_addstr(reply, "BAD_COMMAND");
+        }
+        zstr_free(&c_command);
     }
 
-    // if there is no error msg prepared, call SQL
-    std::vector<std::string> assets;
-    int                      rv = 0;
-    if (zmsg_size(msg) == 0) {
-        rv = select_assets_by_container(container_name, filters, assets, server.getTestMode());
-    }
+    // if there is no error, call SQL
+    if (zmsg_size(reply) == 0) {
+        std::string container_name;
+        {
+            char* c_container_name = zmsg_popstr(msg);
+            container_name = c_container_name ? c_container_name : "";
+            zstr_free(&c_container_name);
+        }
 
-    if (rv == -1) {
-        zmsg_addstr(reply, "ERROR");
-        zmsg_addstr(reply, "INTERNAL_ERROR");
-    } else if (rv == -2) {
-        zmsg_addstr(reply, "ERROR");
-        zmsg_addstr(reply, "ASSET_NOT_FOUND");
-    } else {
-        zmsg_addstr(reply, "OK");
-        for (const auto& dev : assets)
-            zmsg_addstr(reply, dev.c_str());
+        std::set<std::string> filters;
+        while (zmsg_size(msg) > 0) {
+            char* filter = zmsg_popstr(msg);
+            filters.insert(filter);
+            zstr_free(&filter);
+        }
+
+        std::vector<std::string> assets;
+        int rv = select_assets_by_container(container_name, filters, assets, server.getTestMode());
+
+        if (rv == 0) {
+            zmsg_addstr(reply, "OK");
+            for (const auto& dev : assets)
+                zmsg_addstr(reply, dev.c_str());
+        }
+        else {
+            zmsg_addstr(reply, "ERROR");
+            zmsg_addstr(reply, ((rv == -2) ? "ASSET_NOT_FOUND" : "INTERNAL_ERROR"));
+        }
     }
 
     // send the reply
-    rv = mlm_client_sendto(const_cast<mlm_client_t*>(server.getMailboxClient()),
+    int rv = mlm_client_sendto(const_cast<mlm_client_t*>(server.getMailboxClient()),
         mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient())), "ASSETS_IN_CONTAINER", NULL,
         5000, &reply);
 
@@ -587,33 +588,31 @@ static void s_handle_subject_ename_from_iname(const fty::AssetServer& server, zm
     const std::string& client_name = server.getAgentName();
 
     zmsg_t* reply = zmsg_new();
+
     if (zmsg_size(msg) < 1) {
         log_error("%s:\tENAME_FROM_INAME: incoming message have less than 1 frame", client_name.c_str());
         zmsg_addstr(reply, "ERROR");
         zmsg_addstr(reply, "MISSING_INAME");
-        mlm_client_sendto(const_cast<mlm_client_t*>(server.getMailboxClient()),
-            mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient())), "ENAME_FROM_INAME", NULL,
-            5000, &reply);
-        zmsg_destroy(&reply);
-        return;
+    }
+    else {
+        char* iname_str = zmsg_popstr(msg);
+        std::string iname(iname_str ? iname_str : "");
+        zstr_free(&iname_str);
+
+        std::string ename;
+        select_ename_from_iname(iname, ename, server.getTestMode());
+
+        if (ename.empty()) {
+            zmsg_addstr(reply, "ERROR");
+            zmsg_addstr(reply, "ASSET_NOT_FOUND");
+        } else {
+            zmsg_addstr(reply, "OK");
+            zmsg_addstr(reply, ename.c_str());
+        }
     }
 
-    char*       iname_str = zmsg_popstr(msg);
-    std::string iname(iname_str ? iname_str : "");
-    zstr_free(&iname_str);
-
-    std::string ename;
-    select_ename_from_iname(iname, ename, server.getTestMode());
-
-    if (ename.empty()) {
-        zmsg_addstr(reply, "ERROR");
-        zmsg_addstr(reply, "ASSET_NOT_FOUND");
-    } else {
-        zmsg_addstr(reply, "OK");
-        zmsg_addstr(reply, ename.c_str());
-    }
-
-    [[maybe_unused]] int rv = mlm_client_sendto(const_cast<mlm_client_t*>(server.getMailboxClient()),
+    // send the reply
+    int rv = mlm_client_sendto(const_cast<mlm_client_t*>(server.getMailboxClient()),
         mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient())), "ENAME_FROM_INAME", NULL,
         5000, &reply);
 
@@ -624,6 +623,7 @@ static void s_handle_subject_ename_from_iname(const fty::AssetServer& server, zm
     zmsg_destroy(&reply);
 }
 
+//TODO rework error processing
 static void s_handle_subject_assets(const fty::AssetServer& server, zmsg_t* msg)
 {
     assert (msg);
