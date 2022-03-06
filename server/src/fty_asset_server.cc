@@ -797,67 +797,66 @@ static zmsg_t* s_publish_create_or_update_asset_msg(const std::string& client_na
         return NULL;
     }
 
-    // create uuid ext attribute if missing
-    if (!zhash_lookup(ext, "uuid")) {
-        const char* serial = static_cast<const char*>(zhash_lookup(ext, "serial_no"));
-        const char* model  = static_cast<const char*>(zhash_lookup(ext, "model"));
-        const char* mfr    = static_cast<const char*>(zhash_lookup(ext, "manufacturer"));
-        const char* type   = static_cast<const char*>(zhash_lookup(aux, "type"));
-        if (!type)
-            type = "";
+    // handle required but missing ext. attributes (inventory)
+    {
+        zhash_t* inventory = zhash_new();
+        zhash_autofree(inventory);
 
-        fty_uuid_t* uuid = fty_uuid_new();
-        zhash_t* ext_new = zhash_new();
+        // create uuid ext attribute if missing
+        if (!zhash_lookup(ext, "uuid")) {
+            const char* serial = static_cast<const char*>(zhash_lookup(ext, "serial_no"));
+            const char* model  = static_cast<const char*>(zhash_lookup(ext, "model"));
+            const char* mfr    = static_cast<const char*>(zhash_lookup(ext, "manufacturer"));
 
-        if (serial && model && mfr) {
-            // we have all information => create uuid
-            const char* uuid_new = fty_uuid_calculate(uuid, mfr, model, serial);
-            zhash_insert(ext, "uuid", static_cast<void*>( const_cast<char*>(uuid_new)));
-            zhash_insert(ext_new, "uuid", static_cast<void*>( const_cast<char*>(uuid_new)));
-
-            process_insert_inventory(asset_name.c_str(), ext_new, true, test_mode);
-        }
-        else {
-            // generate random uuid and save it
-            const char* uuid_new = fty_uuid_generate(uuid);
-            zhash_insert(ext, "uuid", static_cast<void*>( const_cast<char*>(uuid_new)));
-            zhash_insert(ext_new, "uuid", static_cast<void*>( const_cast<char*>(uuid_new)));
-
-            process_insert_inventory(asset_name.c_str(), ext_new, true, test_mode);
+            fty_uuid_t* uuid = fty_uuid_new();
+            const char* uuid_new = nullptr;
+            if (serial && model && mfr) {
+                // we have all information => create uuid
+                uuid_new = fty_uuid_calculate(uuid, mfr, model, serial);
+            }
+            else {
+                // generate random uuid
+                uuid_new = fty_uuid_generate(uuid);
+            }
+            zhash_insert(inventory, "uuid", static_cast<void*>( const_cast<char*>(uuid_new)));
+            fty_uuid_destroy(&uuid);
         }
 
-        fty_uuid_destroy(&uuid);
-        zhash_destroy(&ext_new);
-    }
+        // create timestamp ext attribute if missing
+        if (!zhash_lookup(ext, "create_ts")) {
+            std::time_t timestamp = std::time(NULL);
+            char        mbstr[100];
+            std::strftime(mbstr, sizeof(mbstr), "%FT%T%z", std::localtime(&timestamp));
+            zhash_insert(inventory, "create_ts", static_cast<void*>( const_cast<char*>(mbstr)));
+        }
 
-    // create timestamp ext attribute if missing
-    if (!zhash_lookup(ext, "create_ts")) {
-        zhash_t* ext_new = zhash_new();
+        if (zhash_size(inventory) != 0) {
+            // update ext
+            for (void* it = zhash_first(inventory); it != NULL; it = zhash_next(inventory)) {
+                auto keytag = zhash_cursor(inventory);
+                auto value = it;
+                zhash_insert(ext, keytag, value);
+            }
+            // update db inventory
+            process_insert_inventory(asset_name.c_str(), inventory, true, test_mode);
+        }
 
-        std::time_t timestamp = std::time(NULL);
-        char        mbstr[100];
-
-        std::strftime(mbstr, sizeof(mbstr), "%FT%T%z", std::localtime(&timestamp));
-
-        zhash_insert(ext, "create_ts", static_cast<void*>( const_cast<char*>(mbstr)));
-        zhash_insert(ext_new, "create_ts", static_cast<void*>( const_cast<char*>(mbstr)));
-
-        process_insert_inventory(asset_name.c_str(), ext_new, true, test_mode);
-
-        zhash_destroy(&ext_new);
+        zhash_destroy(&inventory);
     }
 
     std::function<void(const tntdb::Row&)> cb3 = [aux](const tntdb::Row& row) {
-        for (const auto& name :
-            {"parent_name1", "parent_name2", "parent_name3", "parent_name4", "parent_name5", "parent_name6",
-                "parent_name7", "parent_name8", "parent_name9", "parent_name10"}) {
+        static const std::vector<std::string> parentNames({"parent_name1", "parent_name2", "parent_name3",
+                "parent_name4", "parent_name5", "parent_name6",
+                "parent_name7", "parent_name8", "parent_name9", "parent_name10"});
+        for (const auto& name : parentNames) {
             std::string foo;
             row[name].get(foo);
+            if (foo.empty())
+                continue;
             std::string hash_name = name;
-            //                11 == strlen ("parent_name")
-            hash_name.insert(11, 1, '.');
-            if (!foo.empty())
-                zhash_insert(aux, hash_name.c_str(), static_cast<void*>( const_cast<char*>(foo.c_str())));
+            // 11 == strlen ("parent_name")
+            hash_name.insert(11, 1, '.'); // parent_nameX -> parent_name.X
+            zhash_insert(aux, hash_name.c_str(), static_cast<void*>( const_cast<char*>(foo.c_str())));
         }
     };
 
@@ -871,7 +870,7 @@ static zmsg_t* s_publish_create_or_update_asset_msg(const std::string& client_na
         return NULL;
     }
 
-    // other information like, groups, power chain for now are not included in the message
+    // other information like, groups, powerchain for now are not included in the message
     const char* type = static_cast<const char*>(zhash_lookup(aux, "type"));
     const char* subtype = static_cast<const char*>(zhash_lookup(aux, "subtype"));
 
@@ -880,6 +879,7 @@ static zmsg_t* s_publish_create_or_update_asset_msg(const std::string& client_na
     subject.append((subtype == NULL) ? "unknown" : subtype);
     subject.append("@");
     subject.append(asset_name);
+
     log_debug("notifying ASSETS %s %s ..", operation, subject.c_str());
 
     zmsg_t* msg = fty_proto_encode_asset(aux, asset_name.c_str(), operation, ext);
@@ -1096,13 +1096,11 @@ static void s_handle_subject_asset_manipulation(const fty::AssetServer& server, 
             zmsg_addstr(reply, "OK");
             zmsg_addstr(reply, asset.getInternalName().c_str());
 
-            cxxtools::SerializationInfo si;
-
             // before update
             cxxtools::SerializationInfo tmpSi;
-
             tmpSi <<= currentAsset;
 
+            cxxtools::SerializationInfo si;
             cxxtools::SerializationInfo& before = si.addMember("");
             before.setCategory(cxxtools::SerializationInfo::Category::Object);
             before = tmpSi;
@@ -1128,8 +1126,10 @@ static void s_handle_subject_asset_manipulation(const fty::AssetServer& server, 
             zmsg_addstr(reply, "OPERATION_NOT_IMPLEMENTED");
         }
     } catch (const std::exception& e) {
-        log_error(e.what());
+        log_error("exception reached: %s", e.what());
         fty_proto_print(proto);
+        zmsg_destroy(&reply); // reinit for error
+        reply = zmsg_new();
         zmsg_addstr(reply, "ERROR");
         zmsg_addstr(reply, e.what());
     }
@@ -1322,7 +1322,6 @@ void fty_asset_server(zsock_t* pipe, void* args)
             zmsg_destroy(&msg);
             continue;
         }
-
         // This agent is a reactive agent, it reacts only on messages
         // and doesn't do anything if there are no messages
         else if (which == mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getMailboxClient()))) {
@@ -1398,7 +1397,6 @@ void fty_asset_server(zsock_t* pipe, void* args)
     }
 
     log_info("%s:\tended", server.getAgentName().c_str());
-    // TODO:  save info to persistence before I die
     zpoller_destroy(&poller);
 }
 
@@ -1721,6 +1719,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_destroy(&reply);
         log_info("fty-asset-server-test:Test #10: OK");
     }
+
     zactor_t* autoupdate_server = zactor_new(fty_asset_autoupdate_server, static_cast<void*>( const_cast<char*>("asset-autoupdate-test")));
     zstr_sendx(autoupdate_server, "CONNECT", endpoint.c_str(), NULL);
     zsock_wait(autoupdate_server);
