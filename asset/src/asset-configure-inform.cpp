@@ -31,18 +31,27 @@
 
 namespace fty::asset {
 
+static void* voidify(const std::string& str)
+{
+    return reinterpret_cast<void*>(const_cast<char*>(str.c_str()));
+}
+
 static zhash_t* s_map2zhash(const std::map<std::string, std::string>& m)
 {
     zhash_t* ret = zhash_new();
     zhash_autofree(ret);
     for (const auto& it : m) {
-        zhash_insert(ret, ::strdup(it.first.c_str()), ::strdup(it.second.c_str()));
+        zhash_insert(ret, it.first.c_str(), voidify(it.second));
     }
     return ret;
 }
 
-static bool getDcUPSes(fty::db::Connection& conn, const std::string& assetName, zhash_t* hash)
+// IMPORTANT NOTE: upses *must* be autofree
+static bool getDcUPSes(fty::db::Connection& conn, const std::string& assetName, zhash_t* upses)
 {
+    if (!upses)
+        return false;
+
     std::vector<std::string> listUps;
 
     auto cb = [&listUps](const fty::db::Row& row) {
@@ -62,20 +71,13 @@ static bool getDcUPSes(fty::db::Connection& conn, const std::string& assetName, 
     }
 
     int i = 0;
-    for (auto& ups : listUps) {
-        char key[14];
-        sprintf(key, "ups%d", i);
-        char* ups_name = strdup(ups.c_str());
-        zhash_insert(hash, key, reinterpret_cast<void*>(ups_name));
+    for (const auto& ups : listUps) {
+        char key[16];
+        snprintf(key, sizeof(key), "ups%d", i);
+        zhash_insert(upses, key, voidify(ups));
         i++;
     }
     return true;
-}
-
-
-static void* voidify(const std::string& str)
-{
-    return reinterpret_cast<void*>(const_cast<char*>(str.c_str()));
 }
 
 Expected<void> sendConfigure(
@@ -127,18 +129,21 @@ Expected<void> sendConfigure(
         std::string dc_name;
 
         auto cb = [aux, &dc_name](const fty::db::Row& row) {
-            for (const auto& name : {"parent_name1", "parent_name2", "parent_name3", "parent_name4", "parent_name5",
-                     "parent_name6", "parent_name7", "parent_name8", "parent_name9", "parent_name10"}) {
-                std::string foo       = row.get(name);
-                std::string hash_name = name;
+            static const std::vector<std::string> names({"parent_name1", "parent_name2", "parent_name3", "parent_name4", "parent_name5",
+                     "parent_name6", "parent_name7", "parent_name8", "parent_name9", "parent_name10"});
+
+            for (const auto& name : names) {
+                std::string foo = row.get(name);
+                if (foo.empty())
+                    continue;
+                std::string hash_name{name};
                 // 11 == strlen ("parent_name")
                 hash_name.insert(11, 1, '.');
-                if (!foo.empty()) {
-                    zhash_insert(aux, hash_name.c_str(), voidify(foo));
-                    dc_name = foo;
-                }
+                zhash_insert(aux, hash_name.c_str(), voidify(foo));
+                dc_name = foo;
             }
         };
+
         auto res = db::selectAssetElementSuperParent(oneRow.first.id, cb);
         if (!res) {
             logError("selectAssetElementSuperParent error: {}", res.error());
@@ -151,36 +156,51 @@ Expected<void> sendConfigure(
 
         zmsg_t* msg = fty_proto_encode_asset(aux, oneRow.first.name.c_str(), operation2str(oneRow.second).c_str(), ext);
 
+        zhash_destroy(&ext); //useless
+        zhash_destroy(&aux);
+
         r = mlm_client_send(client, subject.c_str(), &msg);
         if (r != 0) {
             mlm_client_destroy(&client);
             return unexpected("mlm_client_send () failed.");
         }
 
-        zhash_destroy(&aux);
-        zhash_destroy(&ext);
-
         // ask fty-asset to republish so we would get UUID
         if (streq(operation2str(oneRow.second).c_str(), FTY_PROTO_ASSET_OP_CREATE) ||
-            streq(operation2str(oneRow.second).c_str(), FTY_PROTO_ASSET_OP_UPDATE)) {
+            streq(operation2str(oneRow.second).c_str(), FTY_PROTO_ASSET_OP_UPDATE))
+        {
             zmsg_t* republish = zmsg_new();
             zmsg_addstr(republish, s_asset_name.c_str());
-            mlm_client_sendto(client, "asset-agent", "REPUBLISH", nullptr, 5000, &republish);
+            r = mlm_client_sendto(client, AGENT_FTY_ASSET, "REPUBLISH", nullptr, 5000, &republish);
+            zmsg_destroy(&republish);
+            if (r != 0) {
+                log_error("sendto %s REPUBLISH %s failed.", AGENT_FTY_ASSET, s_asset_name.c_str());
+            }
+            //FIXME consume the response ?!
         }
 
         // data for uptime
         if (oneRow.first.subtypeId == persist::asset_subtype::UPS) {
             zhash_t* aux1 = zhash_new();
-
+            zhash_autofree(aux1);
             if (!getDcUPSes(conn, dc_name, aux1))
                 log_error("Cannot read upses for dc with id = %s", dc_name.c_str());
 
             zhash_update(aux1, "type", reinterpret_cast<void*>(const_cast<char*>("datacenter")));
-            zmsg_t*     msg1     = fty_proto_encode_asset(aux1, dc_name.c_str(), "inventory", nullptr);
+
+            zmsg_t* msg1 = fty_proto_encode_asset(aux1, dc_name.c_str(), "inventory", nullptr);
+            zhash_destroy(&aux1);
+
             std::string subject1 = "datacenter.unknown@";
+#if 1 // 2.4.0-1: keep that bug
             subject.append(dc_name);
             r = mlm_client_send(client, subject.c_str(), &msg1);
-            zhash_destroy(&aux1);
+#else // BUGFIX
+            subject1.append(dc_name);
+            r = mlm_client_send(client, subject1.c_str(), &msg1);
+#endif
+            zmsg_destroy(&msg1);
+
             if (r != 0) {
                 mlm_client_destroy(&client);
                 return unexpected("mlm_client_send () failed.");
