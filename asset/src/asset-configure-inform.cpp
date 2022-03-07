@@ -192,8 +192,13 @@ Expected<void> sendConfigure(
             zhash_destroy(&aux1);
 
             std::string subject1 = "datacenter.unknown@";
-            subject1.append(dc_name); //BUGFIX was subject
+#if 1 // 2.4.0-1: keep that bug
+            subject.append(dc_name);
+            r = mlm_client_send(client, subject.c_str(), &msg1);
+#else // BUGFIX
+            subject1.append(dc_name);
             r = mlm_client_send(client, subject1.c_str(), &msg1);
+#endif
             zmsg_destroy(&msg1);
 
             if (r != 0) {
