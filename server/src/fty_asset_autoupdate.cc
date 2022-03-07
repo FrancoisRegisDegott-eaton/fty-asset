@@ -215,11 +215,11 @@ autoupdate_request_all_rcs (fty_asset_autoupdate_t *self)
     zmsg_addstr (msg, "GET");
     zmsg_addstr (msg, "");
     zmsg_addstr (msg, "rack controller");
-    [[maybe_unused]] int rv = mlm_client_sendto (self->client, self->asset_agent_name, "ASSETS_IN_CONTAINER", NULL, 5000, &msg);
+    int rv = mlm_client_sendto (self->client, self->asset_agent_name, "ASSETS_IN_CONTAINER", NULL, 5000, &msg);
     if (rv != 0) {
         log_error ("%s:\tRequest RC list failed", self->name);
-        zmsg_destroy (&msg);
     }
+    zmsg_destroy (&msg);
 }
 
 void
@@ -342,6 +342,7 @@ fty_asset_autoupdate_server (zsock_t *pipe, void *args)
             else
             if (streq (cmd, "ASSET_AGENT_NAME")) {
                 char *name = zmsg_popstr (msg);
+                zstr_free(&self->asset_agent_name);
                 self->asset_agent_name = name;
             }
             else

@@ -184,6 +184,9 @@ int process_insert_inventory(
 {
     if (test)
         return 0;
+    if (!ext_attributes || (zhash_size(ext_attributes) == 0))
+        return 0;
+
     tntdb::Connection conn;
     try {
         conn = tntdb::connectCached(DBConn::url);
@@ -244,6 +247,9 @@ int process_insert_inventory(const std::string& device_name, zhash_t* ext_attrib
 {
     if (test)
         return 0;
+    if (!ext_attributes || (zhash_size(ext_attributes) == 0))
+        return 0;
+
     tntdb::Connection conn;
     try {
         conn = tntdb::connectCached(DBConn::url);
