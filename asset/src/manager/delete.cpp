@@ -202,7 +202,7 @@ AssetExpected<db::AssetElement> AssetManager::deleteAsset(const db::AssetElement
     if (sendNotify) {
         try {
             logDebug("Deleting all mappings for asset {}", asset.name);
-            deleteMappings(asset.name);
+            deleteAllMappings(asset.name);
         } catch (const std::exception& e) {
             log_error("Failed to update CAM: %s", e.what());
         }

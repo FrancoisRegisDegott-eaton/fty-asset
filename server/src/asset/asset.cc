@@ -865,9 +865,9 @@ DeleteStatus AssetImpl::deleteList(const std::vector<std::string>& assets, bool 
             d.remove(removeLastDC);
             deleted.push_back({d, "OK"});
 
-            // remove CAM mappings
+            // remove all CAM mappings
             try {
-                deleteMappings(d.getInternalName());
+                deleteAllMappings(d.getInternalName());
             } catch (const std::exception& e) {
                 log_error("Failed to update CAM: %s", e.what());
             }
