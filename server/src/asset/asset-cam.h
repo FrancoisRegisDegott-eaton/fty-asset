@@ -30,3 +30,5 @@ using ExtMap = std::map<std::string, fty::ExtMapElement>;
 std::list<CredentialMapping> getCredentialMappings(const ExtMap& extMap);
 void createMappings(const std::string& assetInternalName, const std::list<CredentialMapping>& credentialList);
 void deleteMappings(const std::string& assetInternalName);
+void deleteAllMappings(const std::string& assetInternalName);
+
