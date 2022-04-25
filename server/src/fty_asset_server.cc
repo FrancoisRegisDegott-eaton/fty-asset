@@ -506,7 +506,7 @@ static void s_handle_subject_topology(const fty::AssetServer& server, zmsg_t* ms
             mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient())), "TOPOLOGY", NULL, 5000,
             &reply);
         if (r != 0) {
-            log_error("%s:\tTOPOLOGY %s: cannot send response message", command, client_name.c_str());
+            log_error("%s:\tTOPOLOGY (command: %s): mlm_client_sendto failed", client_name.c_str(), command);
         }
     }
 
@@ -645,15 +645,20 @@ static void s_handle_subject_assets(const fty::AssetServer& server, zmsg_t* msg)
 
     char* c_command = zmsg_popstr(msg);
     if (!streq(c_command, "GET")) {
-        log_error("%s:\tASSETS: bad command '%s', expected GET", client_name.c_str(), c_command);
+
+        const char *sender = mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient()));
+        const char *subject = mlm_client_subject(const_cast<mlm_client_t*>(server.getMailboxClient()));
+        log_error("%s:\tASSETS command GET expected (command: %s, sender: %s, subject: %s",
+            client_name.c_str(), c_command, sender, subject);
+
         char* uuid = zmsg_popstr(msg);
         if (uuid)
             zmsg_addstr(reply, uuid);
         zmsg_addstr(reply, "ERROR");
         zmsg_addstr(reply, "BAD_COMMAND");
         mlm_client_sendto(const_cast<mlm_client_t*>(server.getMailboxClient()),
-            mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient())), "ASSETS", NULL, 5000,
-            &reply);
+            sender, "ASSETS", NULL, 5000, &reply);
+
         zstr_free(&c_command);
         zstr_free(&uuid);
         zmsg_destroy(&reply);
@@ -1236,14 +1241,17 @@ void fty_asset_server(zsock_t* pipe, void* args)
 
     while (!zsys_interrupted) {
 
-        void* which = zpoller_wait(poller, -1);
-        if (!which) {
-            // cannot expire as waiting until infinity
-            // so it is interrupted
-            break; // while
+        const int POLL_TIMEOUT_S = 30;
+        void* which = zpoller_wait(poller, POLL_TIMEOUT_S * 1000);
+        if (which == NULL) {
+            //log_debug("which = NULL");
+            if (zpoller_terminated(poller) || zsys_interrupted)
+                break;
+            continue;
         }
 
         if (which == pipe) {
+            //log_debug("which = PIPE"); }
             zmsg_t* msg = zmsg_recv(pipe);
             char*   cmd = zmsg_popstr(msg);
             log_debug("%s:\tActor command=%s", server.getAgentName().c_str(), cmd);
@@ -1329,19 +1337,20 @@ void fty_asset_server(zsock_t* pipe, void* args)
             if (zmessage == NULL) {
                 continue;
             }
-            std::string subject = mlm_client_subject(const_cast<mlm_client_t*>(server.getMailboxClient()));
-            if (subject == "TOPOLOGY") {
+            const char* sender = mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient()));
+            const char* subject = mlm_client_subject(const_cast<mlm_client_t*>(server.getMailboxClient()));
+            log_info("%s:\tMAILBOX DELIVER (sender: %s, subject: %s)", server.getAgentName().c_str(), sender, subject);
+
+            if (streq(subject,"TOPOLOGY")) {
                 s_handle_subject_topology(server, zmessage);
-            } else if (subject == "ASSETS_IN_CONTAINER") {
+            } else if (streq(subject,"ASSETS_IN_CONTAINER")) {
                 s_handle_subject_assets_in_container(server, zmessage);
-            } else if (subject == "ASSETS") {
+            } else if (streq(subject,"ASSETS")) {
                 s_handle_subject_assets(server, zmessage);
-            } else if (subject == "ENAME_FROM_INAME") {
+            } else if (streq(subject,"ENAME_FROM_INAME")) {
                 s_handle_subject_ename_from_iname(server, zmessage);
-            } else if (subject == "REPUBLISH") {
-                zmsg_print(zmessage);
-                log_trace("REPUBLISH received from '%s'",
-                    mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient())));
+            } else if (streq(subject,"REPUBLISH")) {
+
                 char* asset = zmsg_popstr(zmessage);
                 if (!asset || streq(asset, "$all")) {
                     s_repeat_all(server);
@@ -1355,25 +1364,14 @@ void fty_asset_server(zsock_t* pipe, void* args)
                     s_repeat_all(server, assets_to_publish);
                 }
                 zstr_free(&asset);
+                // do not reply anything (requesters don't expect an answer)
 
-                //reply
-                {
-                    const char* sender = mlm_client_sender(const_cast<mlm_client_t*>(server.getMailboxClient()));
-                    zmsg_t* msg = zmsg_new();
-                    zmsg_addstr(msg, "DONE");
-                    int rv = mlm_client_sendto(const_cast<mlm_client_t*>(server.getMailboxClient()),
-                        sender, subject.c_str(), NULL, 5000, &msg);
-                    zmsg_destroy(&msg);
-                    if (rv != 0) {
-                        log_error("%s:\tmlm_client_sendto failed ('%s')", server.getAgentName().c_str(), subject.c_str());
-                    }
-                }
-            } else if (subject == "ASSET_MANIPULATION") {
+            } else if (streq(subject,"ASSET_MANIPULATION")) {
                 s_handle_subject_asset_manipulation(server, &zmessage);
-            } else if (subject == "ASSET_DETAIL") {
+            } else if (streq(subject,"ASSET_DETAIL")) {
                 s_handle_subject_asset_detail(server, &zmessage);
             } else {
-                log_info("%s:\tUnexpected subject '%s'", server.getAgentName().c_str(), subject.c_str());
+                log_info("%s:\tUnexpected subject '%s'", server.getAgentName().c_str(), subject);
             }
             zmsg_destroy(&zmessage);
         } else if (which == mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getStreamClient()))) {
@@ -1381,18 +1379,22 @@ void fty_asset_server(zsock_t* pipe, void* args)
             if (zmessage == NULL) {
                 continue;
             }
+
             if (fty_proto_is(zmessage)) {
                 fty_proto_t* bmsg = fty_proto_decode(&zmessage);
+
                 if (fty_proto_id(bmsg) == FTY_PROTO_ASSET) {
+                    log_debug("%s:\tSTREAM DELIVER (PROTO_ASSET)", server.getAgentName().c_str());
                     s_update_topology(server, bmsg);
                 } else if (fty_proto_id(bmsg) == FTY_PROTO_METRIC) {
+                    log_debug("%s:\tSTREAM DELIVER (PROTO_METRIC)", server.getAgentName().c_str());
                     handle_incoming_limitations(server, bmsg);
                 }
                 fty_proto_destroy(&bmsg);
             }
             zmsg_destroy(&zmessage);
         } else {
-            // DO NOTHING for now
+            //log_debug("OTHER");
         }
     }
 
