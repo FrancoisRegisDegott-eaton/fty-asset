@@ -108,13 +108,30 @@ void createMappings(const std::string& assetInternalName, const std::list<Creden
 void deleteMappings(const std::string& assetInternalName)
 {
     try {
-        log_debug("Deleting all mappings for asset %s", assetInternalName.c_str());
+        log_debug("Deleting monitoring mappings for asset %s", assetInternalName.c_str());
         // remove CAM mappings
         cam::Accessor camAccessor(CAM_CLIENT_ID, CAM_TIMEOUT_MS, MALAMUTE_ENDPOINT);
         //delete only my mapping
         auto mappings = camAccessor.getMappings(assetInternalName, CAM_SERVICE_ID);
         for(const auto& m : mappings) {
             log_debug("Deleting mapping %s : %s", m.m_serviceId.c_str(), m.m_protocol.c_str());
+            camAccessor.removeMapping(m.m_assetId, m.m_serviceId, m.m_protocol);
+        }
+    } catch (std::exception& e) {
+        log_error("Asset mappings could not be removed: %s", e.what());
+    }
+}
+
+void deleteAllMappings(const std::string& assetInternalName)
+{
+    try {
+        log_debug("Deleting all mappings for asset %s", assetInternalName.c_str());
+        // remove CAM mappings
+        cam::Accessor camAccessor(CAM_CLIENT_ID, CAM_TIMEOUT_MS, MALAMUTE_ENDPOINT);
+        //delete only my mapping
+        auto mappings = camAccessor.getAssetMappings(assetInternalName);
+        for(const auto& m : mappings) {
+            log_debug("Deleting mapping %s : %s (%s)", m.m_serviceId.c_str(), m.m_protocol.c_str(), m.m_serviceId.c_str());
             camAccessor.removeMapping(m.m_assetId, m.m_serviceId, m.m_protocol);
         }
     } catch (std::exception& e) {
