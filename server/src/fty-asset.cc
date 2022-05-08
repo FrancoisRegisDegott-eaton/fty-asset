@@ -80,6 +80,7 @@ int main (int argc, char *argv [])
         ManageFtyLog::getInstanceFtylog()->setVerboseMode();
     }
 
+    log_info("new asset_server");
     zactor_t *asset_server = zactor_new (fty_asset_server, static_cast<void*>( const_cast<char*>("asset-agent")));
     zstr_sendx (asset_server, "CONNECTSTREAM", endpoint, NULL);
     zsock_wait (asset_server);
@@ -93,34 +94,40 @@ int main (int argc, char *argv [])
     zsock_wait (asset_server);
     zstr_sendx (asset_server, "REPEAT_ALL", NULL);
 
+    log_info("new autoupdate_server");
     zactor_t *autoupdate_server = zactor_new (fty_asset_autoupdate_server, static_cast<void*>( const_cast<char*>("asset-autoupdate")));
     zstr_sendx (autoupdate_server, "CONNECT", endpoint, NULL);
     zsock_wait (autoupdate_server);
     zstr_sendx (autoupdate_server, "PRODUCER", "ASSETS", NULL);
     zsock_wait (autoupdate_server);
     zstr_sendx (autoupdate_server, "ASSET_AGENT_NAME", "asset-agent", NULL);
-    zsock_wait (autoupdate_server);
+    //no signal transmitted here!
     zstr_sendx (autoupdate_server, "WAKEUP", NULL);
 
+    log_info("new inventory_server");
     zactor_t *inventory_server = zactor_new (fty_asset_inventory_server, static_cast<void*>( const_cast<char*>("asset-inventory")));
     zstr_sendx (inventory_server, "CONNECT", endpoint, NULL);
     zsock_wait (inventory_server);
     zstr_sendx (inventory_server, "CONSUMER", "ASSETS", ".*", NULL);
 
     // create regular event for agents
+    log_info("new loop");
     zloop_t *loop = zloop_new();
 
     // timer: send WAKEUP msg to autoupdate_server
     size_t interval_s = 5 * 60;
     zloop_timer (loop, interval_s * 1000, 0, s_autoupdate_timer, autoupdate_server);
+    log_info("[WAKEUP] timer interval_s: %zu", interval_s);
 
     // timer: send REPEAT_ALL msg to asset_server
     // set up how ofter assets should be repeated
     char *repeat_interval = getenv("BIOS_ASSETS_REPEAT");
     interval_s = repeat_interval ? static_cast<size_t>(std::stoi(repeat_interval)) : (60 * 60);
     zloop_timer (loop, interval_s * 1000, 0, s_repeat_assets_timer, asset_server);
+    log_info("[REPEAT_ALL] timer interval_s: %zu", interval_s);
 
     // takes ownership of this thread and waits for interrupt
+    log_info("fty-asset started");
     zloop_start (loop);
     zloop_destroy (&loop);
 
@@ -128,5 +135,6 @@ int main (int argc, char *argv [])
     zactor_destroy (&autoupdate_server);
     zactor_destroy (&asset_server);
 
+    log_info("fty-asset ended");
     return EXIT_SUCCESS;
 }
