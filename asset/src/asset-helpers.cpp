@@ -156,12 +156,18 @@ AssetExpected<void> tryToPlaceAsset(uint32_t id, uint32_t parentId, uint32_t siz
         if (!chAttr) {
             continue;
         }
-        if (!chAttr->count("u_size") && !chAttr->count("location_u_pos")) {
-            continue;
+        if (!chAttr->count("u_size") || !chAttr->count("location_u_pos")) {
+            continue; // the child does not have u_size/location_u_pos, ignore it
         }
 
-        size_t isize = convert<size_t>(chAttr->at("u_size").value);
-        size_t iloc  = convert<size_t>(chAttr->at("location_u_pos").value) - 1;
+        size_t isize = 0;
+        size_t iloc = 0;
+        try {
+            isize = convert<size_t>(chAttr->at("u_size").value);
+            iloc  = convert<size_t>(chAttr->at("location_u_pos").value) - 1;
+        } catch (...) {
+            return unexpected("Asset child u_size/location_u_pos is not a number"_tr);
+        }
 
         for (size_t i = iloc; i < iloc + isize; ++i) {
             if (i < place.size()) {
