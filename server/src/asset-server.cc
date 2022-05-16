@@ -20,8 +20,8 @@
 */
 
 #include "asset-server.h"
-
 #include "asset/asset-utils.h"
+#include <asset/asset-helpers.h>
 
 #include <algorithm>
 #include <fty_asset_dto.h>
@@ -406,6 +406,13 @@ void AssetServer::createAsset(const messagebus::Message& msg)
         std::string    userData = msg.userData().front();
         fty::AssetImpl asset;
         fty::Asset::fromJson(userData, asset);
+
+        auto ipAddr = asset.getExtEntry("ip.1");
+        asset::AssetFilter filter(asset.getManufacturer(), asset.getModel(), asset.getSerialNo(), ipAddr);
+        auto ret = asset::checkDuplicatedAsset(filter);
+        if(!ret) {
+            throw std::runtime_error("Asset already exists");
+        }
 
         bool requestActivation = (asset.getAssetStatus() == AssetStatus::Active);
 
