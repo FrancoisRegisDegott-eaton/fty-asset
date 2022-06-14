@@ -273,11 +273,12 @@ private:
     {
         if (auto ret = db::selectExtRwAttributesKeytags()) {
             for (const auto& tag : *ret) {
+                // Filter aux attributes
                 auto pos = std::find(m_assetElementKeytags.cbegin(), m_assetElementKeytags.cend(), tag);
                 if (pos != m_assetElementKeytags.end()) {
-                    return {};
+                    continue;
                 }
-
+                // And just keep ext attributes that are not already preset in m_keytags
                 if (std::find(keyTags.cbegin(), keyTags.cend(), tag) == keyTags.end()) {
                     keyTags.push_back(tag);
                 }
