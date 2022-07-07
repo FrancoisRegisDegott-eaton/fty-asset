@@ -29,24 +29,7 @@
 
 namespace fty::asset {
 
-struct Outlet
-{
-    std::string label;
-    bool        label_r;
-    std::string type;
-    bool        type_r;
-    std::string group;
-    bool        group_r;
-};
-
-static std::string getOutletNumber(const std::string& extAttributeName)
-{
-    auto        dot1    = extAttributeName.find_first_of(".");
-    std::string oNumber = extAttributeName.substr(dot1 + 1);
-    auto        dot2    = oNumber.find_first_of(".");
-    oNumber             = oNumber.substr(0, dot2);
-    return oNumber;
-}
+ using Outlet = std::map<std::string, std::pair<std::string, bool>>;
 
 static double s_rack_realpower_nominal(const std::string& name)
 {
@@ -234,9 +217,9 @@ std::string getJsonAsset(uint32_t elemId)
     std::vector<std::string>      fqdns;
     std::vector<std::string>      hostnames;
     if (!tmp->extAttributes.empty()) {
-        std::regex r_outlet_label("^outlet\\.[0-9][0-9]*\\.label$");
-        std::regex r_outlet_group("^outlet\\.[0-9][0-9]*\\.group$");
-        std::regex r_outlet_type("^outlet\\.[0-9][0-9]*\\.type$");
+        std::smatch r_match;
+        std::regex r_outlet_main("^outlet\\.(label|switchable)$");
+        std::regex r_outlet("^outlet\\.([0-9]*)\\.(label|group|type|switchable)$");
         std::regex r_ip("^ip\\.[0-9][0-9]*$");
         std::regex r_mac("^mac\\.[0-9][0-9]*$");
         std::regex r_hostname("^hostname\\.[0-9][0-9]*$");
@@ -253,35 +236,33 @@ std::string getJsonAsset(uint32_t elemId)
 
             auto& attrValue  = oneExt.second.value;
             auto  isReadOnly = oneExt.second.readOnly;
-            if (std::regex_match(attrName, r_outlet_label)) {
-                auto oNumber = getOutletNumber(attrName);
-                auto it      = outlets.find(oNumber);
-                if (it == outlets.cend()) {
-                    auto r = outlets.emplace(oNumber, Outlet());
-                    it     = r.first;
+            // HOTFIX: Add main outlet for ups
+            if (tmp->subtypeName == "ups" && std::regex_match(attrName, r_match, r_outlet_main)) {
+                if (r_match.size() == 2) {
+                    auto key = r_match[1].str();
+                    auto it  = outlets.find("0");
+                    if (it == outlets.cend()) {
+                        auto r = outlets.emplace("0", Outlet());
+                        it     = r.first;
+                    }
+                    it->second[key].first  = attrValue;
+                    it->second[key].second = isReadOnly;
                 }
-                it->second.label   = attrValue;
-                it->second.label_r = isReadOnly;
                 continue;
-            } else if (std::regex_match(attrName, r_outlet_group)) {
-                auto oNumber = getOutletNumber(attrName);
-                auto it      = outlets.find(oNumber);
-                if (it == outlets.cend()) {
-                    auto r = outlets.emplace(oNumber, Outlet());
-                    it     = r.first;
-                }
-                it->second.group   = attrValue;
-                it->second.group_r = isReadOnly;
-                continue;
-            } else if (std::regex_match(attrName, r_outlet_type)) {
-                auto oNumber = getOutletNumber(attrName);
-                auto it      = outlets.find(oNumber);
-                if (it == outlets.cend()) {
-                    auto r = outlets.emplace(oNumber, Outlet());
-                    it     = r.first;
-                }
-                it->second.type   = attrValue;
-                it->second.type_r = isReadOnly;
+            }
+            // Add other outlets
+            else if (std::regex_match(attrName, r_match, r_outlet)) {
+                 if (r_match.size() == 3) {
+                    auto oNumber = r_match[1].str();
+                    auto key     = r_match[2].str();
+                    auto it      = outlets.find(oNumber);
+                    if (it == outlets.cend()) {
+                        auto r = outlets.emplace(oNumber, Outlet());
+                        it     = r.first;
+                    }
+                    it->second[key].first  = attrValue;
+                    it->second[key].second = isReadOnly;
+                 }
                 continue;
             } else if (std::regex_match(attrName, r_ip)) {
                 ips.push_back(attrValue);
@@ -308,6 +289,28 @@ std::string getJsonAsset(uint32_t elemId)
 
             isExtCommaNeeded = true;
         } // end of for each loop for ext attribute
+    }
+
+    // HOTFIX: construct all missing outlets for sts device
+    if (tmp->subtypeName == "sts" && outlets.size() == 0) {
+        // get outlet.count
+        auto it = tmp->extAttributes.find("outlet.count");
+        if (it != tmp->extAttributes.end()) {
+            int outletCount = std::atoi(it->second.value.c_str());
+            // construct each missing outlet, e.g for N outlets:
+            // "outlets":{
+            //  "1":[{name: "label", value: "Outlet 1", read_only: "true"}],
+            //   ...
+            //  "N":[{name: "label", value: "Outlet N", read_only: "true"}],
+            // }
+            for (int iOutlet = 1; iOutlet <= outletCount; iOutlet ++) {
+                auto outletId = std::to_string(iOutlet);
+                auto outletName = std::string("Outlet ") + outletId;
+                auto r = outlets.emplace(outletId, Outlet());
+                r.first->second["label"].first  = outletName;
+                r.first->second["label"].second = true;
+            }
+        }
     }
 
     json += "]";
@@ -383,38 +386,18 @@ std::string getJsonAsset(uint32_t elemId)
             bool isCommaNeeded = false;
 
             json += "\"" + (oneOutlet.first) + "\" : [";
-            if (!oneOutlet.second.label.empty()) {
 
-                std::string outletLabel = oneOutlet.second.label;
-
-                json += "{\"name\":\"label\",";
-                json += utils::json::jsonify("value", outletLabel) + ",\"read_only\" : ";
-                json += oneOutlet.second.label_r ? "true" : "false";
-                json += "}";
-                isCommaNeeded = true;
-            }
-
-            if (!oneOutlet.second.group.empty()) {
+            // for each key found
+            for (const auto& elt : oneOutlet.second) {
                 if (isCommaNeeded) {
                     json += ",";
                 }
-
-                json += "{\"name\":\"group\",";
-                json += utils::json::jsonify("value", oneOutlet.second.group) + ",\"read_only\" : ";
-                json += oneOutlet.second.group_r ? "true" : "false";
+                auto key = elt.first;
+                json += "{\"name\":\"" + key + "\",";
+                json += utils::json::jsonify("value", oneOutlet.second[key].first) + ",\"read_only\" : ";
+                json += oneOutlet.second[key].second ? "true" : "false";
                 json += "}";
                 isCommaNeeded = true;
-            }
-
-            if (!oneOutlet.second.type.empty()) {
-                if (isCommaNeeded) {
-                    json += ",";
-                }
-
-                json += "{\"name\":\"type\",";
-                json += utils::json::jsonify("value", oneOutlet.second.type) + ",\"read_only\" : ";
-                json += oneOutlet.second.type_r ? "true" : "false";
-                json += "}";
             }
 
             json += "]";
