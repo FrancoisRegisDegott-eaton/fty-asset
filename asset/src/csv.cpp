@@ -58,7 +58,6 @@ static const std::string _ci_strip(const std::string& str)
 
 void CsvMap::deserialize()
 {
-
     if (_data.size() == 0) {
         throw std::invalid_argument(TRANSLATE_ME("Can't process empty data set"));
     }
@@ -71,9 +70,8 @@ void CsvMap::deserialize()
             throw std::invalid_argument(msg);*/
             log_warning("Duplicate title name '%s', we will still use the previous on.", title.c_str());
         } else {
-            _title_to_index.emplace(title, i);            
+            _title_to_index.emplace(title, i);
         }
-
 
         i++;
     }
@@ -81,7 +79,6 @@ void CsvMap::deserialize()
 
 const std::string& CsvMap::get(size_t row_i, const std::string& title_name) const
 {
-
     if (row_i >= _data.size()) {
         std::string msg = TRANSLATE_ME("row_index %zu was out of range %zu", row_i, _data.size());
         throw std::out_of_range(msg);
@@ -202,10 +199,7 @@ bool hasApostrof(std::istream& i)
 
 CsvMap CsvMap_from_istream(std::istream& in)
 {
-    cxxtools::CsvDeserializer             deserializer(in);
-    std::vector<std::vector<std::string>> data;
-    char                                  delimiter = findDelimiter(in);
-
+    char delimiter = findDelimiter(in);
     if (delimiter == '\x0') {
         std::string msg = TRANSLATE_ME("Cannot detect the delimiter, use comma (,) semicolon (;) or tabulator");
         log_error("%s\n", msg.c_str());
@@ -213,9 +207,15 @@ CsvMap CsvMap_from_istream(std::istream& in)
         throw std::invalid_argument(msg);
     }
     log_debug("Using delimiter '%c'", delimiter);
-    deserializer.delimiter(delimiter);
-    deserializer.readTitle(false);
-    deserializer.deserialize(data);
+
+    std::vector<std::vector<std::string>> data;
+    {
+        cxxtools::CsvDeserializer deserializer(in);
+        deserializer.delimiter(delimiter);
+        deserializer.readTitle(false);
+        deserializer.deserialize(data);
+    }
+
     CsvMap cm{data};
     cm.deserialize();
     return cm;

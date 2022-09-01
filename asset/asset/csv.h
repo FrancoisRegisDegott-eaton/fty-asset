@@ -86,7 +86,7 @@ public:
     }
 
     /**
-     * \brief deserialize provided data, inicialize map of row title to index
+     * \brief deserialize provided data, initialize map of row title to index
      *
      * \throws std::invalid_argument if csv contain multiple title with the
      *         same name
