@@ -10,7 +10,7 @@ class LineCsvSerializer
 {
 public:
     explicit LineCsvSerializer(std::ostream& out)
-        : _cs{out}
+        : _cs{out, nullptr} // disable default utf8 codec (raw data is utf8 compliant)
     {
     }
 
