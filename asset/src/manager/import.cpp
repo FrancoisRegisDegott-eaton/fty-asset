@@ -54,8 +54,27 @@ static std::string sanitize(const std::string& csvStr)
 AssetExpected<AssetManager::ImportList> AssetManager::importCsv(
     const std::string& csvStr, const std::string& user, bool sendNotify)
 {
-    std::stringstream ss(sanitize(csvStr));
-    CsvMap            csv = CsvMap_from_istream(ss);
+    std::function<std::string(const std::string&)> iso_8859_1_to_utf8 = [](const std::string& strIn)
+    {
+        std::string strOut;
+        for (auto it = strIn.begin(); it != strIn.end(); ++it)
+        {
+            auto ch = static_cast<unsigned char>(*it);
+            if (ch < 0x80) {
+                strOut.push_back(static_cast<char>(ch));
+            }
+            else {
+                strOut.push_back(static_cast<char>(0xc0 | (ch >> 6)));
+                strOut.push_back(static_cast<char>(0x80 | (ch & 0x3f)));
+            }
+        }
+        return strOut;
+    };
+
+    // decode iso_8859_1 to utf8 (éàè)... more?
+    std::stringstream ss(sanitize(iso_8859_1_to_utf8(csvStr)));
+
+    CsvMap csv = CsvMap_from_istream(ss);
 
     csv.setCreateMode(CREATE_MODE_CSV);
     csv.setCreateUser(user);

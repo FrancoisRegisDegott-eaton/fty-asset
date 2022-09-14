@@ -46,28 +46,34 @@ persist::asset_operation Import::operation() const
     return m_operation;
 }
 
-
 std::string Import::mandatoryMissing() const
 {
-    static std::vector<std::string> mandatory = {"name", "type", "sub_type", "location", "status", "priority"};
+    static const std::vector<std::string> mandatory = {
+        "name", "type", "sub_type", "location", "status", "priority"
+    };
 
     auto all_fields = m_cm.getTitles();
     for (const auto& s : mandatory) {
         if (all_fields.count(s) == 0)
-            return s;
+            return s; // mandatory column is missing
     }
 
-    return "";
+    return ""; // ok, empty
 }
 
 std::map<std::string, std::string> Import::sanitizeRowExtNames(size_t row, bool sanitize) const
 {
-    static std::vector<std::string>    sanitizeList = {"location", "logical_asset", "power_source.", "group."};
+    static std::vector<std::string> sanitizeList = {
+        "location", "logical_asset", "power_source.", "group."
+    };
+
     std::map<std::string, std::string> result;
+
     // make copy of this one line
     for (auto title : m_cm.getTitles()) {
         result[title] = m_cm.get(row, title);
     }
+
     if (sanitize) {
         // sanitize ext names to t_bios_asset_element.name
         for (auto item : sanitizeList) {
@@ -83,7 +89,7 @@ std::map<std::string, std::string> Import::sanitizeRowExtNames(size_t row, bool 
 
                     auto name = db::extNameToAssetName(strip(it->second));
                     if (!name) {
-                        logError(name.error());
+                        logError("{}", name.error());
                     } else {
                         logDebug("sanitized {} '{}' -> '{}'", title, it->second, *name);
                         result[title] = *name;
@@ -95,7 +101,7 @@ std::map<std::string, std::string> Import::sanitizeRowExtNames(size_t row, bool 
                 if (it != result.end()) {
                     auto name = db::extNameToAssetName(strip(it->second));
                     if (!name) {
-                        logError(name.error());
+                        logError("{}", name.error());
                     } else {
                         logDebug("sanitized {} '{}' -> '{}'", it->first, it->second, *name);
                         result[item] = *name;
@@ -104,9 +110,11 @@ std::map<std::string, std::string> Import::sanitizeRowExtNames(size_t row, bool 
             }
         }
     }
+
     return result;
 }
 
+// returns 1..5
 uint16_t Import::getPriority(const std::string& s) const
 {
     if (s.size() > 2)
@@ -157,44 +165,34 @@ bool Import::isDate(const std::string& key) const
 
 AssetExpected<void> Import::process(bool checkLic)
 {
-    auto m = mandatoryMissing();
-    if (m != "") {
+    std::string m = mandatoryMissing();
+    if (!m.empty()) {
         logError("column '{}' is missing, import is aborted", m);
         return unexpected(error(Errors::ParamRequired).format(m));
     }
 
-    std::set<uint32_t> ids;
     if (checkLic) {
         if (auto limitations = getLicensingLimitation(); !limitations) {
             return unexpected(error(Errors::InternalError).format(limitations.error()));
-        } else {
-            if (!limitations->global_configurability) {
-                return unexpected(error(Errors::ActionForbidden)
-                                      .format("Asset handling"_tr, "Licensing global_configurability limit hit"_tr));
-            }
-
-            for (size_t row = 1; row != m_cm.rows(); ++row) {
-                if (auto it = processRow(row, ids, true, checkLic)) {
-                    ids.insert(it->id);
-                    m_el.emplace(row, *it);
-                } else {
-                    m_el.emplace(row, unexpected(it.error()));
-                }
-            }
         }
-    } else {
-        for (size_t row = 1; row != m_cm.rows(); ++row) {
-            if (auto it = processRow(row, ids, true, checkLic)) {
-                ids.insert(it->id);
-                m_el.emplace(row, *it);
-            } else {
-                m_el.emplace(row, unexpected(it.error()));
-            }
+        else if (!limitations->global_configurability) {
+            return unexpected(error(Errors::ActionForbidden)
+                   .format("Asset handling"_tr, "Licensing global_configurability limit hit"_tr));
         }
     }
+
+    std::set<uint32_t> ids;
+    for (size_t row = 1; row != m_cm.rows(); ++row) {
+        if (auto it = processRow(row, ids, true, checkLic)) {
+            ids.insert(it->id);
+            m_el.emplace(row, *it);
+        } else {
+            m_el.emplace(row, unexpected(it.error()));
+        }
+    }
+
     return {};
 }
-
 
 AssetExpected<db::AssetElement> Import::processRow(
     size_t row, const std::set<uint32_t>& ids, bool sanitize, bool checkLic)
