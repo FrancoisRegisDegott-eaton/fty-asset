@@ -21,17 +21,18 @@
 
 #include "asset-db.h"
 #include "asset.h"
-#include <cstdlib>
+#include "fty-lock.h"
+#include "asset/asset-helpers.h"
+
 #include <fty_common_db_dbpath.h>
+#include <cstdlib>
 #include <sstream>
 #include <tntdb.h>
 #include <map>
 #include <algorithm>
-#include <asset/asset-helpers.h>
 
 #include <cassert>
 
-#include "fty-lock.h"
 namespace fty {
 
 // static helpers

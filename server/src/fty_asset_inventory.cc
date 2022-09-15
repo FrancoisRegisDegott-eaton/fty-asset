@@ -27,20 +27,17 @@
 */
 
 #include "fty_asset_inventory.h"
+#include "dns.h"
+#include "asset/dbhelpers.h"
 
+#include <fty_log.h>
+#include <fty_proto.h>
 #include <malamute.h>
 
 #include <unordered_map>
 #include <string>
 #include <vector>
-
-#include "dns.h"
-#include "fty_log.h"
-#include "fty_proto.h"
-#include "asset/dbhelpers.h"
-
-
-//  Structure of our class
+#include <iostream>
 
 void
 fty_asset_inventory_server (zsock_t *pipe, void *args)
@@ -57,8 +54,9 @@ fty_asset_inventory_server (zsock_t *pipe, void *args)
     while (!zsys_interrupted)
     {
         void *which = zpoller_wait (poller, -1);
-        if (!which)
+        if (!which) {
             continue;
+        }
         else
         if (which == pipe) {
             zmsg_t *msg = zmsg_recv (pipe);
@@ -104,8 +102,7 @@ fty_asset_inventory_server (zsock_t *pipe, void *args)
                 zstr_free (&stream);
                 zsock_signal (pipe, 0);
             }
-            else
-            {
+            else {
                 log_info ("%s:\tUnhandled command %s", name, cmd);
             }
             zstr_free (&cmd);
@@ -115,6 +112,7 @@ fty_asset_inventory_server (zsock_t *pipe, void *args)
         if (which == mlm_client_msgpipe (client)) {
             zmsg_t *msg = mlm_client_recv (client);
             fty_proto_t *proto = fty_proto_decode (&msg);
+            zmsg_destroy (&msg);
             if (!proto) {
                 log_warning ("%s:'tfty_proto_decode () failed", name);
                 continue;
@@ -125,18 +123,21 @@ fty_asset_inventory_server (zsock_t *pipe, void *args)
 
             if (streq (operation, "inventory")) {
                 zhash_t *ext = fty_proto_ext (proto);
-                [[maybe_unused]] int rv = process_insert_inventory (device_name, ext, true, ext_map_cache, test);
-                if (rv != 0)
+                int rv = process_insert_inventory (device_name, ext, true, ext_map_cache, test);
+                if (rv != 0) {
                     log_error ("Could not insert inventory data into DB");
+                }
             } else if (streq (operation, "delete")) {
                 //  Vacuum the cache
                 //  The keys are formatted as asset_name:keytag[01]
                 device_name.append(":");
-                for (auto it = ext_map_cache.begin(); it != ext_map_cache.end(); )
-                    if (it->first.compare(0, device_name.size(), device_name) == 0)
+                for (auto it = ext_map_cache.begin(); it != ext_map_cache.end(); ) {
+                    if (it->first.compare(0, device_name.size(), device_name) == 0) {
                         it = ext_map_cache.erase(it);
-                    else
+                    } else {
                         ++it;
+                    }
+                }
             }
             fty_proto_destroy (&proto);
         }
@@ -153,7 +154,7 @@ fty_asset_inventory_server (zsock_t *pipe, void *args)
 void
 fty_asset_inventory_test (bool /*verbose*/)
 {
-    printf (" * fty_asset_inventory: ");
+    std::cout << " * fty_asset_inventory:" << std::endl;
 
     //  @selftest
     //  Test #1: Simple create/destroy test
@@ -188,7 +189,7 @@ fty_asset_inventory_test (bool /*verbose*/)
                 "MyDC",
                 "inventory",
                 NULL);
-        [[maybe_unused]] int rv = mlm_client_send (ui, "inventory@dc-1", &msg);
+        int rv = mlm_client_send (ui, "inventory@dc-1", &msg);
         assert (rv == 0);
         zclock_sleep (200);
         log_info ("fty-asset-server-test:Test #2: OK");
@@ -197,6 +198,7 @@ fty_asset_inventory_test (bool /*verbose*/)
     zactor_destroy (&inventory_server);
     mlm_client_destroy (&ui);
     zactor_destroy (&server);
+
     //  @end
-    printf ("OK\n");
+    std::cout << "fty_asset_inventory: OK" << std::endl;
 }

@@ -19,30 +19,12 @@
     =========================================================================
 */
 
-#ifndef FTY_ASSET_INVENTORY_H_INCLUDED
-#define FTY_ASSET_INVENTORY_H_INCLUDED
+#pragma once
 
 #include <czmq.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef struct _fty_asset_inventory_t fty_asset_inventory_t;
-
-//  @interface
 //  Destroy the fty_asset_inventory
- void
-    fty_asset_inventory_server (zsock_t *pipe, void *args);
+void fty_asset_inventory_server (zsock_t *pipe, void *args);
 
 //  Self test of this class
- void
-    fty_asset_inventory_test (bool verbose);
-
-//  @end
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+void fty_asset_inventory_test (bool verbose);

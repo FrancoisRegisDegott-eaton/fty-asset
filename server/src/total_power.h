@@ -19,8 +19,7 @@
     =========================================================================
 */
 
-#ifndef TOTAL_POWER_H_INCLUDED
-#define TOTAL_POWER_H_INCLUDED
+#pragma once
 
 #include <string>
 #include <vector>
@@ -40,17 +39,9 @@
  *         -1 - in case of internal error
  *         -2 - in case the requested asset was not found
  */
-//  Self test of this class
 
- int
-    select_devices_total_power(
-        const std::string &assetName,
-        std::vector<std::string> &powerDevices,
-        bool test
-    );
-
- void
-    total_power_test (bool verbose);
-
-
-#endif
+int select_devices_total_power(
+    const std::string &assetName,
+    std::vector<std::string> &powerDevices,
+    bool test
+);

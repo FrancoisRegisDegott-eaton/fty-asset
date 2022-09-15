@@ -19,32 +19,13 @@
     =========================================================================
 */
 
-#ifndef FTY_ASSET_SERVER_H_INCLUDED
-#define FTY_ASSET_SERVER_H_INCLUDED
+#pragma once
 
 #include <czmq.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#define TEST_INAME "DC-1"
-#define TEST_ENAME "MyDC"
-
-typedef struct _fty_asset_server_t fty_asset_server_t;
-
-//  @interface
 //  Asset server, that takes care about distribution of
-//                                      asset information across the system
- void fty_asset_server(zsock_t* pipe, void* args);
+//  asset information across the system
+void fty_asset_server(zsock_t* pipe, void* args);
 
 //  Self test of this class
- void fty_asset_server_test(bool verbose);
-
-//  @end
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+void fty_asset_server_test(bool verbose);

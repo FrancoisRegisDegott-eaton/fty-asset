@@ -189,14 +189,22 @@
 
 @end
 */
+
 #include "fty_asset_server.h"
 #include "fty_asset_autoupdate.h"
 
+#include "test_str.h"
 #include "asset-server.h"
 #include "asset/asset-utils.h"
+#include "asset/dbhelpers.h"
+
+#include "total_power.h"
+#include "topology_processor.h"
+#include "topology_power.h"
 
 #include <ctime>
 #include <string>
+#include <iostream>
 
 #include <fty_asset_dto.h>
 #include <fty_common.h>
@@ -207,20 +215,13 @@
 #include <mlm_client.h>
 #include <sys/time.h>
 #include <tntdb/connect.h>
+#include <fty_proto.h>
 #include <fty_common.h>
 #include <fty_common_db.h>
 #include <fty_common_mlm.h>
 #include <uuid/uuid.h>
 
-#include "fty_proto.h"
-#include "total_power.h"
-#include "asset/dbhelpers.h"
-
-#include "topology_processor.h"
-#include "topology_power.h"
-
 #include <cassert>
-
 
 bool g_testMode = false;
 
@@ -1466,7 +1467,8 @@ void fty_asset_server_test(bool /*verbose*/)
     log_debug("Setting test mode to true");
     g_testMode = true;
 
-    printf(" * fty_asset_server: ");
+    std::cout << " * fty_asset_server:" << std::endl;
+
     //  @selftest
     // Test #1:  Simple create/destroy test
     {
@@ -1512,8 +1514,10 @@ void fty_asset_server_test(bool /*verbose*/)
     zsock_wait(asset_server);
     zstr_sendx(asset_server, "CONNECTMAILBOX", endpoint.c_str(), NULL);
     zsock_wait(asset_server);
+
     static const char* asset_name = TEST_INAME;
-    // Test #2: subject ASSET_MANIPULATION, message fty_proto_t *asset
+
+    std::cout << "Test #2: subject ASSET_MANIPULATION, message fty_proto_t *asset" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #2");
         const char* subject = "ASSET_MANIPULATION";
@@ -1571,7 +1575,7 @@ void fty_asset_server_test(bool /*verbose*/)
         log_info("fty-asset-server-test:Test #2: OK");
     }
 
-    // Test #3: message fty_proto_t *asset
+    std::cout << "Test #3: message fty_proto_t *asset" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #3");
         zmsg_t* msg = fty_proto_encode_asset(NULL, asset_name, FTY_PROTO_ASSET_OP_UPDATE, NULL);
@@ -1580,7 +1584,8 @@ void fty_asset_server_test(bool /*verbose*/)
         zclock_sleep(200);
         log_info("fty-asset-server-test:Test #3: OK");
     }
-    // Test #4: subject TOPOLOGY, message POWER
+
+    std::cout << "Test #4: subject TOPOLOGY, message POWER" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #4");
         const char* subject = "TOPOLOGY";
@@ -1614,7 +1619,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_destroy(&reply);
         log_info("fty-asset-server-test:Test #4: OK");
     }
-    // Test #5: subject ASSETS_IN_CONTAINER, message GET
+    std::cout << "Test #5: subject ASSETS_IN_CONTAINER, message GET" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #5");
         const char* subject = "ASSETS_IN_CONTAINER";
@@ -1633,7 +1638,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_destroy(&reply);
         log_info("fty-asset-server-test:Test #5: OK");
     }
-    // Test #6: subject ASSETS, message GET
+    std::cout << "Test #6: subject ASSETS, message GET" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #6");
         const char* subject = "ASSETS";
@@ -1656,7 +1661,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_destroy(&reply);
         log_info("fty-asset-server-test:Test #6: OK");
     }
-    // Test #7: message REPEAT_ALL
+    std::cout << "Test #7: message REPEAT_ALL" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #7");
         const char* command = "REPEAT_ALL";
@@ -1665,7 +1670,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zclock_sleep(200);
         log_info("fty-asset-server-test:Test #7: OK");
     }
-    // Test #8: subject REPUBLISH, message $all
+    std::cout << "Test #8: subject REPUBLISH, message $all" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #8");
         const char* subject = "REPUBLISH";
@@ -1676,7 +1681,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zclock_sleep(200);
         log_info("fty-asset-server-test:Test #8: OK");
     }
-    // Test #9: subject ASSET_DETAIL, message GET/<iname>
+    std::cout << "Test #9: subject ASSET_DETAIL, message GET/<iname>" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #9");
         const char* subject = "ASSET_DETAIL";
@@ -1702,7 +1707,7 @@ void fty_asset_server_test(bool /*verbose*/)
         log_info("fty-asset-server-test:Test #9: OK");
     }
 
-    // Test #10: subject ENAME_FROM_INAME, message <iname>
+    std::cout << "Test #10: subject ENAME_FROM_INAME, message <iname>" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #10");
         const char* subject     = "ENAME_FROM_INAME";
@@ -1729,7 +1734,7 @@ void fty_asset_server_test(bool /*verbose*/)
     zsock_wait(autoupdate_server);
     zstr_sendx(autoupdate_server, "ASSET_AGENT_NAME", asset_server_test_name.c_str(), NULL);
 
-    // Test #11: message WAKEUP
+    std::cout << "Test #11: message WAKEUP" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #11");
         const char* command = "WAKEUP";
@@ -1739,7 +1744,7 @@ void fty_asset_server_test(bool /*verbose*/)
         log_info("fty-asset-server-test:Test #11: OK");
     }
 
-    // Test #12: test licensing limitations
+    std::cout << "Test #12: test licensing limitations" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #12");
         // try to create asset when configurability is enabled
@@ -1907,7 +1912,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_destroy(&reply); // throw away stream message
     }
 
-    // Test #13: asset conversion to json
+    std::cout << "Test #13: asset conversion to json" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #13");
 
@@ -1930,7 +1935,7 @@ void fty_asset_server_test(bool /*verbose*/)
         log_debug("fty-asset-server-test:Test #13 OK");
     }
 
-    // Test #14: asset conversion to fty-proto
+    std::cout << "Test #14: asset conversion to fty-proto" << std::endl;
     {
         log_debug("fty-asset-server-test:Test #14");
 
@@ -1959,7 +1964,7 @@ void fty_asset_server_test(bool /*verbose*/)
         log_debug("fty-asset-server-test:Test #14 OK");
     }
 
-    // Test #15: new generation asset interface
+    std::cout << "Test #15: new generation asset interface" << std::endl;
     {
         static const char* FTY_ASSET_TEST_Q   = "FTY.Q.ASSET.TEST";
         static const char* FTY_ASSET_TEST_PUB = "test-publisher";
@@ -2050,5 +2055,5 @@ void fty_asset_server_test(bool /*verbose*/)
     zactor_destroy(&server);
 
     //  @end
-    printf("OK\n");
+    std::cout << "fty_asset_server: OK" << std::endl;
 }

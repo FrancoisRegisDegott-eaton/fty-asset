@@ -25,23 +25,14 @@
 #include <set>
 #include <map>
 
-//  @interface
+std::set<std::string> name_to_ip4 (const char *name);
 
- std::set<std::string>
-    name_to_ip4 (const char *name);
+std::set<std::string> name_to_ip6 (const char *name);
 
- std::set<std::string>
-    name_to_ip6 (const char *name);
+std::set<std::string> name_to_ip (const char *name);
 
- std::set<std::string>
-    name_to_ip (const char *name);
+std::string ip_to_name (const char *ip);
 
- std::string
-    ip_to_name (const char *ip);
+std::map<std::string,std::set<std::string>> local_addresses();
 
- std::map<std::string,std::set<std::string>>
-    local_addresses();
-
- void
-    dns_test (bool verbose);
-
+void dns_test (bool verbose);

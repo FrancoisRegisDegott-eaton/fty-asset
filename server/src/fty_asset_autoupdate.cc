@@ -21,32 +21,30 @@
 
 /*
 @header
-    fty_asset_autoupdate - Asset server, that udates some of asset information on change like IP address in case of DHCP
+    fty_asset_autoupdate - Asset server, that udpates some of asset information on change like IP address in case of DHCP
 @discuss
 @end
 */
 
 #include "fty_asset_autoupdate.h"
+#include "dns.h"
 
+#include <fty_log.h>
+#include <fty_proto.h>
 #include <malamute.h>
-
 #include <string>
 #include <vector>
-
-#include "dns.h"
-#include "fty_log.h"
-#include "fty_proto.h"
+#include <iostream>
 
 //  Structure of our class
 
-struct _fty_asset_autoupdate_t {
-    mlm_client_t *client = NULL;
-    char *name = NULL;
-    char *asset_agent_name = NULL;
+struct fty_asset_autoupdate_t {
+    mlm_client_t *client{nullptr};
+    char *name{nullptr};
+    char *asset_agent_name{nullptr};
     std::vector<std::string> rcs;
-    bool verbose;
+    bool verbose{false};
 };
-
 
 //  --------------------------------------------------------------------------
 //  Destroy the fty_asset_autoupdate
@@ -54,8 +52,7 @@ struct _fty_asset_autoupdate_t {
 void
 fty_asset_autoupdate_destroy (fty_asset_autoupdate_t **self_p)
 {
-    assert (self_p);
-    if (*self_p) {
+    if (self_p && *self_p) {
         fty_asset_autoupdate_t *self = *self_p;
         zstr_free (&self->name);
         zstr_free (&self->asset_agent_name);
@@ -71,13 +68,15 @@ fty_asset_autoupdate_destroy (fty_asset_autoupdate_t **self_p)
 fty_asset_autoupdate_t *
 fty_asset_autoupdate_new (void)
 {
-    fty_asset_autoupdate_t *self = (fty_asset_autoupdate_t *) zmalloc (sizeof (fty_asset_autoupdate_t));
-    assert (self);
-    self->client = mlm_client_new ();
-    if (self->client) {
-        self->verbose = false;
+    fty_asset_autoupdate_t *self = (fty_asset_autoupdate_t *) zmalloc (sizeof (*self));
+    if (!self) {
+        return NULL;
     }
-    else {
+
+    self->verbose = false;
+    self->client = mlm_client_new ();
+
+    if (!self->client) {
         fty_asset_autoupdate_destroy (&self);
     }
     return self;
@@ -297,7 +296,7 @@ fty_asset_autoupdate_server (zsock_t *pipe, void *args)
                     log_info ("%s:\tGot $TERM", self->name);
                 zstr_free (&cmd);
                 zmsg_destroy (&msg);
-                goto exit;
+                break;
             }
             else
             if (streq (cmd, "VERBOSE")) {
@@ -359,7 +358,7 @@ fty_asset_autoupdate_server (zsock_t *pipe, void *args)
             zmsg_destroy (&zmessage);
         }
     }
- exit:
+
     log_info ("%s:\tended", self->name);
     zpoller_destroy (&poller);
     fty_asset_autoupdate_destroy (&self);
@@ -371,13 +370,13 @@ fty_asset_autoupdate_server (zsock_t *pipe, void *args)
 void
 fty_asset_autoupdate_test (bool /*verbose*/)
 {
-    printf (" * fty_asset_autoupdate: ");
+    std::cout << " * fty_asset_autoupdate: " << std::endl;
 
-    //  @selftest
     //  Simple create/destroy test
     fty_asset_autoupdate_t *self = fty_asset_autoupdate_new ();
     assert (self);
     fty_asset_autoupdate_destroy (&self);
-    //  @end
-    printf ("OK\n");
+    assert (!self);
+
+    std::cout << "fty_asset_autoupdate: OK"  << std::endl;
 }

@@ -28,7 +28,6 @@
 
 #include "dns.h"
 
-
 #include <netdb.h>
 #include <sys/socket.h>
 #include <netinet/ip.h>
@@ -36,10 +35,9 @@
 #include <ifaddrs.h>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 
 #include <cassert>
-
-
 
 std::set<std::string> name_to_ip4 (const char *name)
 {
@@ -87,7 +85,8 @@ std::set<std::string> name_to_ip6 (const char *name)
     return result;
 }
 
-std::set<std::string> name_to_ip (const char *name) {
+std::set<std::string> name_to_ip (const char *name)
+{
     std::set<std::string> ip4 = name_to_ip4 (name);
     std::set<std::string> ip6 = name_to_ip6 (name);
     ip4.insert (ip6.begin(), ip6.end());
@@ -185,12 +184,10 @@ std::map<std::string,std::set<std::string>> local_addresses()
 //  --------------------------------------------------------------------------
 //  Self test of this class
 
-void
-dns_test (bool /*verbose*/)
+void dns_test (bool /*verbose*/)
 {
-    printf (" * dns: ");
+    std::cout << " * dns:" << std::endl;
 
-    //  @selftest
     {
         int found = 0;
         for (auto a : name_to_ip4 ("localhost")) {
@@ -198,18 +195,9 @@ dns_test (bool /*verbose*/)
         }
         assert (found == 1);
     }
+
     assert (! ip_to_name("127.0.0.1").empty ());
-    /*
-    auto i = local_addresses ();
-    for (const auto it : i) {
-        printf ("iface %s:", it.first.c_str() );
-        for (auto addr : it.second) {
-            printf (" %s", addr.c_str());
-        }
-        printf ("\n");
-    }
-    */
-    //  @end
-    printf ("OK\n");
+
+    std::cout << "dns: OK" << std::endl;
 }
 

@@ -19,16 +19,9 @@
     =========================================================================
 */
 
-#ifndef TOPOLOGY_PROCESSOR_H_INCLUDED
-#define TOPOLOGY_PROCESSOR_H_INCLUDED
+#pragma once
 
 #include <string>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-//  @interface
 
 // Retrieve the powerchains which powers a requested target asset
 // Implementation of REST /api/v1/topology/power?[from/to/filter_dc/filter_group] (see RFC11)
@@ -38,8 +31,7 @@ extern "C" {
 // On success, RESULT is valid (JSON payload)
 // Returns 0 if success, else <0
 
- int
-    topology_power_process (const std::string & command, const std::string & assetName, std::string & result, std::string & errorMsg, bool beautify = true);
+int topology_power_process (const std::string & command, const std::string & assetName, std::string & result, std::string & errorMsg, bool beautify = true);
 
 // Retrieve the closest powerchain which powers a requested target asset
 // implementation of REST /api/v1/topology/power?to (see RFC11) **filtered** on dst-id == assetName
@@ -48,8 +40,7 @@ extern "C" {
 // On success, RESULT is valid (JSON payload)
 // Returns 0 if success, else <0
 
- int
-    topology_power_to (const std::string & assetName, std::string & result, std::string & errorMsg, bool beautify = true);
+int topology_power_to (const std::string & assetName, std::string & result, std::string & errorMsg, bool beautify = true);
 
 // Retrieve location topology for a requested target asset
 // Implementation of REST /api/v1/topology/location?[from/to] (see RFC11)
@@ -65,8 +56,7 @@ extern "C" {
 // On success, RESULT is valid (JSON payload)
 // Returns 0 if success, else <0
 
- int
-    topology_location_process (const std::string & command, const std::string & assetName, const std::string & options, std::string & result, std::string & errorMsg, bool beautify = true);
+int topology_location_process (const std::string & command, const std::string & assetName, const std::string & options, std::string & result, std::string & errorMsg, bool beautify = true);
 
 // Retrieve input power chain topology for a requested target asset
 // Implementation of REST /api/v1/topology/input_power_chain (see RFC11)
@@ -75,18 +65,4 @@ extern "C" {
 // On success, RESULT is valid (JSON payload)
 // Returns 0 if success, else <0
 
- int
-    topology_input_powerchain_process (const std::string & assetName, std::string & result, std::string & errorMsg, bool beautify = true);
-
-//  Self test of this class
-
- void
-    topology_processor_test (bool verbose);
-
-//  @end
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif
+int topology_input_powerchain_process (const std::string & assetName, std::string & result, std::string & errorMsg, bool beautify = true);

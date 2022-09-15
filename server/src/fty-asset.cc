@@ -19,6 +19,8 @@
     =========================================================================
 */
 
+#ifndef _UNIT_TESTS_COMPILATION_
+
 /*
 @header
     fty_asset - Agent managing assets
@@ -26,55 +28,60 @@
 @end
 */
 
-#include "fty_asset_library.h"
+#include "fty_asset_server.h"
+#include "fty_asset_autoupdate.h"
+#include "fty_asset_inventory.h"
 
 #include <fty_log.h>
+#include <fty_proto.h>
+#include <fty_common.h>
+#include <fty_common_mlm.h>
 #include <czmq.h>
 #include <malamute.h>
 
-#include "fty_asset_autoupdate.h"
-#include "fty_asset_server.h"
-#include "fty_asset_inventory.h"
+#define WAKEUP "WAKEUP"
+#define REPEAT_ALL "REPEAT_ALL"
 
-#define DEFAULT_LOG_CONFIG "/etc/fty/ftylog.cfg"
-
-static int s_autoupdate_timer (zloop_t * /*loop*/, int /*timer_id*/, void *output)
+static void s_usage()
 {
-    zstr_send (output, "WAKEUP");
+    puts ("fty-asset [options] ...");
+    puts ("  --verbose / -v   verbose output");
+    puts ("  --help / -h      this information");
+}
+
+static int s_wakeup_timer (zloop_t * /*loop*/, int /*timer_id*/, void *output)
+{
+    zstr_send (output, WAKEUP);
     return 0;
 }
 
-static int s_repeat_assets_timer (zloop_t * /*loop*/, int /*timer_id*/, void *output)
+static int s_repeat_all_timer (zloop_t * /*loop*/, int /*timer_id*/, void *output)
 {
-    zstr_send (output, "REPEAT_ALL");
+    zstr_send (output, REPEAT_ALL);
     return 0;
 }
 
 int main (int argc, char *argv [])
 {
-    const char* endpoint = "ipc://@/malamute";
-    ManageFtyLog::setInstanceFtylog("fty-asset", DEFAULT_LOG_CONFIG);
     bool verbose = false;
-    int argn;
 
-    for (argn = 1; argn < argc; argn++) {
-        if (streq (argv [argn], "--help")
-        ||  streq (argv [argn], "-h")) {
-            puts ("fty-asset [options] ...");
-            puts ("  --verbose / -v         verbose test output");
-            puts ("  --help / -h            this information");
-            return 0;
+    for (int argn = 1; argn < argc; argn++) {
+        const char* arg = argv [argn];
+        if (streq (arg, "--help") || streq (arg, "-h")) {
+            s_usage();
+            return EXIT_SUCCESS;
         }
-        else
-        if (streq (argv [argn], "--verbose")
-        ||  streq (argv [argn], "-v"))
+        else if (streq (arg, "--verbose") || streq (arg, "-v")) {
             verbose = true;
+        }
         else {
-            printf ("Unknown option: %s\n", argv [argn]);
+            printf ("Unknown option (%s)\n", arg);
         }
     }
 
-    log_info ("fty_asset - Agent managing assets");
+    ManageFtyLog::setInstanceFtylog("fty-asset", FTY_COMMON_LOGGING_DEFAULT_CFG);
+
+    log_info("fty-asset starting...");
 
     if (verbose) {
         ManageFtyLog::getInstanceFtylog()->setVerboseMode();
@@ -82,59 +89,97 @@ int main (int argc, char *argv [])
 
     log_info("new asset_server");
     zactor_t *asset_server = zactor_new (fty_asset_server, static_cast<void*>( const_cast<char*>("asset-agent")));
-    zstr_sendx (asset_server, "CONNECTSTREAM", endpoint, NULL);
+    if (!asset_server) {
+        log_error("asset_server new failed");
+        return EXIT_FAILURE;
+    }
+    zstr_sendx (asset_server, "CONNECTSTREAM", MLM_ENDPOINT, NULL);
     zsock_wait (asset_server);
-    zstr_sendx (asset_server, "PRODUCER", "ASSETS", NULL);
+    zstr_sendx (asset_server, "PRODUCER", FTY_PROTO_STREAM_ASSETS, NULL);
     zsock_wait (asset_server);
-    zstr_sendx (asset_server, "CONSUMER", "ASSETS", ".*", NULL);
+    zstr_sendx (asset_server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
     zsock_wait (asset_server);
-    zstr_sendx (asset_server, "CONSUMER", "LICENSING-ANNOUNCEMENTS", ".*", NULL);
+    zstr_sendx (asset_server, "CONSUMER", FTY_PROTO_STREAM_LICENSING_ANNOUNCEMENTS, ".*", NULL);
     zsock_wait (asset_server);
-    zstr_sendx (asset_server, "CONNECTMAILBOX", endpoint, NULL);
+    zstr_sendx (asset_server, "CONNECTMAILBOX", MLM_ENDPOINT, NULL);
     zsock_wait (asset_server);
-    zstr_sendx (asset_server, "REPEAT_ALL", NULL);
+    zstr_sendx (asset_server, REPEAT_ALL, NULL);
 
     log_info("new autoupdate_server");
     zactor_t *autoupdate_server = zactor_new (fty_asset_autoupdate_server, static_cast<void*>( const_cast<char*>("asset-autoupdate")));
-    zstr_sendx (autoupdate_server, "CONNECT", endpoint, NULL);
+    if (!autoupdate_server) {
+        log_error("autoupdate_server new failed");
+        zactor_destroy(&asset_server);
+        return EXIT_FAILURE;
+    }
+    zstr_sendx (autoupdate_server, "CONNECT", MLM_ENDPOINT, NULL);
     zsock_wait (autoupdate_server);
-    zstr_sendx (autoupdate_server, "PRODUCER", "ASSETS", NULL);
+    zstr_sendx (autoupdate_server, "PRODUCER", FTY_PROTO_STREAM_ASSETS, NULL);
     zsock_wait (autoupdate_server);
-    zstr_sendx (autoupdate_server, "ASSET_AGENT_NAME", "asset-agent", NULL);
+    zstr_sendx (autoupdate_server, "ASSET_AGENT_NAME", AGENT_FTY_ASSET, NULL);
     //no signal transmitted here!
-    zstr_sendx (autoupdate_server, "WAKEUP", NULL);
+    zstr_sendx (autoupdate_server, WAKEUP, NULL);
 
     log_info("new inventory_server");
     zactor_t *inventory_server = zactor_new (fty_asset_inventory_server, static_cast<void*>( const_cast<char*>("asset-inventory")));
-    zstr_sendx (inventory_server, "CONNECT", endpoint, NULL);
+    if (!inventory_server) {
+        log_error("inventory_server new failed");
+        zactor_destroy(&autoupdate_server);
+        zactor_destroy(&asset_server);
+        return EXIT_FAILURE;
+    }
+    zstr_sendx (inventory_server, "CONNECT", MLM_ENDPOINT, NULL);
     zsock_wait (inventory_server);
-    zstr_sendx (inventory_server, "CONSUMER", "ASSETS", ".*", NULL);
+    zstr_sendx (inventory_server, "CONSUMER", FTY_PROTO_STREAM_ASSETS, ".*", NULL);
 
     // create regular event for agents
-    log_info("new loop");
-    zloop_t *loop = zloop_new();
+    log_info("new main_loop");
+    zloop_t *main_loop = zloop_new();
+    if (!main_loop) {
+        log_error("main_loop new failed");
+        zactor_destroy(&inventory_server);
+        zactor_destroy(&autoupdate_server);
+        zactor_destroy(&asset_server);
+        return EXIT_FAILURE;
+    }
 
     // timer: send WAKEUP msg to autoupdate_server
-    size_t interval_s = 5 * 60;
-    zloop_timer (loop, interval_s * 1000, 0, s_autoupdate_timer, autoupdate_server);
-    log_info("[WAKEUP] timer interval_s: %zu", interval_s);
+    {
+        size_t interval_s = 5 * 60;
+        zloop_timer (main_loop, interval_s * 1000, 0, s_wakeup_timer, autoupdate_server);
+        log_info("[WAKEUP] timer interval_s: %zu", interval_s);
+    }
 
     // timer: send REPEAT_ALL msg to asset_server
     // set up how ofter assets should be repeated
-    char *repeat_interval = getenv("BIOS_ASSETS_REPEAT");
-    interval_s = repeat_interval ? static_cast<size_t>(std::stoi(repeat_interval)) : (60 * 60);
-    zloop_timer (loop, interval_s * 1000, 0, s_repeat_assets_timer, asset_server);
-    log_info("[REPEAT_ALL] timer interval_s: %zu", interval_s);
+    {
+        size_t interval_s = 60 * 60;
+        try {
+            const char *interval = getenv("BIOS_ASSETS_REPEAT");
+            if (interval) {
+                interval_s = static_cast<size_t>(std::stoi(interval));
+            }
+        }
+        catch (const std::exception& e) {
+            log_warning("env. BIOS_ASSETS_REPEAT is malformed (%s)", e.what());
+        }
+        zloop_timer (main_loop, interval_s * 1000, 0, s_repeat_all_timer, asset_server);
+        log_info("[REPEAT_ALL] timer interval_s: %zu", interval_s);
+    }
+
+    log_info("fty-asset started");
 
     // takes ownership of this thread and waits for interrupt
-    log_info("fty-asset started");
-    zloop_start (loop);
-    zloop_destroy (&loop);
+    zloop_start (main_loop);
+    zloop_destroy (&main_loop);
 
     zactor_destroy (&inventory_server);
     zactor_destroy (&autoupdate_server);
     zactor_destroy (&asset_server);
 
     log_info("fty-asset ended");
+
     return EXIT_SUCCESS;
 }
+
+#endif //_UNIT_TESTS_COMPILATION_
