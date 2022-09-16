@@ -21,6 +21,7 @@
 
 #pragma once
 #include "asset/asset.h"
+#include <malamute.h>
 #include <fty_srr_dto.h>
 #include <memory>
 #include <mutex>
@@ -67,7 +68,8 @@ static constexpr const char* FTY_ASSET_SRR_AGENT = "asset-agent-srr";
 static constexpr const char* FTY_ASSET_SRR_NAME  = "asset-agent";
 static constexpr const char* FTY_ASSET_SRR_QUEUE = "FTY.Q.ASSET.SRR";
 
-typedef struct _mlm_client_t mlm_client_t;
+//typedef struct _mlm_client_t mlm_client_t;
+
 namespace messagebus {
 class MessageBus;
 class Message;
@@ -194,7 +196,7 @@ private:
     void createAsset(const messagebus::Message& msg);
     void updateAsset(const messagebus::Message& msg);
     void deleteAsset(const messagebus::Message& msg);
-    void getAsset(const messagebus::Message& msg, bool getFromUuid = false);
+    void getAsset(const messagebus::Message& msg, bool getFromUuid);
     void listAsset(const messagebus::Message& msg);
     void getAssetID(const messagebus::Message& msg);
     void getAssetIname(const messagebus::Message& msg);

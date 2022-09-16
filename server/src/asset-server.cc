@@ -21,11 +21,18 @@
 
 #include "asset-server.h"
 #include "asset/asset-utils.h"
-#include <asset/asset-helpers.h>
+#include "asset/asset-helpers.h"
+#include "utilspp.h"
+#include "fty-lock.h"
 
-#include <algorithm>
 #include <fty_asset_dto.h>
 #include <fty/convert.h>
+#include <fty_common.h>
+#include <fty_common_messagebus.h>
+
+#include <malamute.h>
+
+#include <algorithm>
 #include <sstream>
 #include <cstdlib>
 #include <ctime>
@@ -33,15 +40,6 @@
 #include <list>
 
 #include <cxxtools/serializationinfo.h>
-
-#include <fty_common.h>
-#include <fty_common_messagebus.h>
-#include <malamute.h>
-#include <mlm_client.h>
-#include <fty_common.h>
-
-#include "utilspp.h"
-#include "fty-lock.h"
 
 using namespace std::placeholders;
 
@@ -77,9 +75,11 @@ static V value(const std::map<K, V>& map, const typename identify<K>::type& key,
 
 void AssetServer::destroyMlmClient(mlm_client_t* client)
 {
-    mlm_client_destroy(&client);
+    if (client) {
+        mlm_client_t* c = client;
+        mlm_client_destroy(&c);
+    }
 }
-
 
 AssetServer::AssetServer()
     : m_maxActivePowerDevices(-1)
@@ -91,8 +91,10 @@ AssetServer::AssetServer()
 
 void AssetServer::createMailboxClientNg()
 {
-    m_assetMsgQueue.reset(messagebus::MlmMessageBus(m_mailboxEndpoint, m_agentNameNg));
-    log_debug("New mailbox client registered to endpoint %s with name %s", m_mailboxEndpoint.c_str(),
+    std::string endpoint{m_mailboxEndpoint};
+
+    m_assetMsgQueue.reset(messagebus::MlmMessageBus(endpoint, m_agentNameNg));
+    log_debug("New mailbox client registered to endpoint %s with name %s", endpoint.c_str(),
         m_agentNameNg.c_str());
 }
 
@@ -116,37 +118,42 @@ void AssetServer::receiveMailboxClientNg(const std::string& queue)
 
 void AssetServer::createPublisherClientNg()
 {
-    m_publisherCreate.reset(messagebus::MlmMessageBus(m_mailboxEndpoint, m_agentNameNg + "-create"));
-    log_debug("New publisher client registered to endpoint %s with name %s", m_mailboxEndpoint.c_str(),
+    log_debug("createPublisherClientNg");
+
+    std::string endpoint{m_streamEndpoint};
+
+    m_publisherCreate.reset(messagebus::MlmMessageBus(endpoint, m_agentNameNg + "-create"));
+    log_debug("New publisher client registered to endpoint %s with name %s", endpoint.c_str(),
         (m_agentNameNg + "-create").c_str());
 
-    m_publisherUpdate.reset(messagebus::MlmMessageBus(m_mailboxEndpoint, m_agentNameNg + "-update"));
-    log_debug("New publisher client registered to endpoint %s with name %s", m_mailboxEndpoint.c_str(),
+    m_publisherUpdate.reset(messagebus::MlmMessageBus(endpoint, m_agentNameNg + "-update"));
+    log_debug("New publisher client registered to endpoint %s with name %s", endpoint.c_str(),
         (m_agentNameNg + "-update").c_str());
 
-    m_publisherDelete.reset(messagebus::MlmMessageBus(m_mailboxEndpoint, m_agentNameNg + "-delete"));
-    log_debug("New publisher client registered to endpoint %s with name %s", m_mailboxEndpoint.c_str(),
+    m_publisherDelete.reset(messagebus::MlmMessageBus(endpoint, m_agentNameNg + "-delete"));
+    log_debug("New publisher client registered to endpoint %s with name %s", endpoint.c_str(),
         (m_agentNameNg + "-delete").c_str());
 
-
     m_publisherCreateLight.reset(
-        messagebus::MlmMessageBus(m_mailboxEndpoint, m_agentNameNg + "-create-light"));
-    log_debug("New publisher client registered to endpoint %s with name %s", m_mailboxEndpoint.c_str(),
+        messagebus::MlmMessageBus(endpoint, m_agentNameNg + "-create-light"));
+    log_debug("New publisher client registered to endpoint %s with name %s", endpoint.c_str(),
         (m_agentNameNg + "-create-light").c_str());
 
     m_publisherUpdateLight.reset(
-        messagebus::MlmMessageBus(m_mailboxEndpoint, m_agentNameNg + "-update-light"));
-    log_debug("New publisher client registered to endpoint %s with name %s", m_mailboxEndpoint.c_str(),
+        messagebus::MlmMessageBus(endpoint, m_agentNameNg + "-update-light"));
+    log_debug("New publisher client registered to endpoint %s with name %s", endpoint.c_str(),
         (m_agentNameNg + "-update-light").c_str());
 
     m_publisherDeleteLight.reset(
-        messagebus::MlmMessageBus(m_mailboxEndpoint, m_agentNameNg + "-delete-light"));
-    log_debug("New publisher client registered to endpoint %s with name %s", m_mailboxEndpoint.c_str(),
+        messagebus::MlmMessageBus(endpoint, m_agentNameNg + "-delete-light"));
+    log_debug("New publisher client registered to endpoint %s with name %s", endpoint.c_str(),
         (m_agentNameNg + "-delete-light").c_str());
 }
 
 void AssetServer::resetPublisherClientNg()
 {
+    log_debug("resetPublisherClientNg");
+
     m_publisherCreate.reset();
     m_publisherUpdate.reset();
     m_publisherDelete.reset();
@@ -157,6 +164,8 @@ void AssetServer::resetPublisherClientNg()
 
 void AssetServer::connectPublisherClientNg()
 {
+    log_debug("connectPublisherClientNg");
+
     m_publisherCreate->connect();
     m_publisherUpdate->connect();
     m_publisherDelete->connect();
@@ -168,15 +177,12 @@ void AssetServer::connectPublisherClientNg()
 // new generation asset manipulation handler
 void AssetServer::handleAssetManipulationReq(const messagebus::Message& msg)
 {
-    log_debug("Received new asset manipulation message with subject %s",
-        msg.metaData().at(messagebus::Message::SUBJECT).c_str());
-
     // clang-format off
     static std::map<std::string, std::function<void(const messagebus::Message&)>> procMap = {
         { FTY_ASSET_SUBJECT_CREATE,       [&](const messagebus::Message& message){ createAsset(message); } },
         { FTY_ASSET_SUBJECT_UPDATE,       [&](const messagebus::Message& message){ updateAsset(message); } },
         { FTY_ASSET_SUBJECT_DELETE,       [&](const messagebus::Message& message){ deleteAsset(message); } },
-        { FTY_ASSET_SUBJECT_GET,          [&](const messagebus::Message& message){ getAsset(message); } },
+        { FTY_ASSET_SUBJECT_GET,          [&](const messagebus::Message& message){ getAsset(message, false); } },
         { FTY_ASSET_SUBJECT_GET_BY_UUID,  [&](const messagebus::Message& message){ getAsset(message, true); } },
         { FTY_ASSET_SUBJECT_LIST,         [&](const messagebus::Message& message){ listAsset(message); } },
         { FTY_ASSET_SUBJECT_GET_ID,       [&](const messagebus::Message& message){ getAssetID(message); } },
@@ -186,12 +192,14 @@ void AssetServer::handleAssetManipulationReq(const messagebus::Message& msg)
     };
     // clang-format on
 
-    const std::string& messageSubject = value(msg.metaData(), messagebus::Message::SUBJECT);
+    const std::string& subject = value(msg.metaData(), messagebus::Message::SUBJECT);
 
-    if (procMap.find(messageSubject) != procMap.end()) {
-        procMap[messageSubject](msg);
+    log_debug("Received new asset manipulation message with subject %s", subject.c_str());
+
+    if (procMap.find(subject) != procMap.end()) {
+        procMap[subject](msg);
     } else {
-        log_warning("Handle asset manipulation - Unknown subject");
+        log_warning("Handle asset manipulation - Unknown subject (%s)", subject.c_str());
     }
 }
 
@@ -231,13 +239,12 @@ dto::srr::SaveResponse AssetServer::handleSave(const dto::srr::SaveQuery& query)
     using namespace dto;
     using namespace dto::srr;
 
-    log_debug("Saving assets");
+    log_debug("SRR Saving assets");
     std::map<FeatureName, FeatureAndStatus> mapFeaturesData;
 
     for (const auto& featureName : query.features()) {
         FeatureAndStatus fs1;
         Feature&         f1 = *(fs1.mutable_feature());
-
 
         if (featureName == FTY_ASSET_SRR_NAME) {
             f1.set_version(SRR_ACTIVE_VERSION);
@@ -267,7 +274,7 @@ dto::srr::RestoreResponse AssetServer::handleRestore(const dto::srr::RestoreQuer
     using namespace dto;
     using namespace dto::srr;
 
-    log_debug("Restoring assets");
+    log_debug("SRR Restoring assets");
     std::map<FeatureName, FeatureStatus> mapStatus;
 
     for (const auto& item : query.map_features_data()) {
@@ -309,7 +316,7 @@ dto::srr::ResetResponse AssetServer::handleReset(const dto::srr::ResetQuery& /*q
     using namespace dto;
     using namespace dto::srr;
 
-    log_debug("Reset assets");
+    log_debug("SRR Reset assets");
     std::map<FeatureName, FeatureStatus> mapStatus;
 
     const FeatureName& featureName = FTY_ASSET_SRR_NAME;
@@ -371,9 +378,12 @@ void AssetServer::sendNotification(const messagebus::Message& msg) const
 
 void AssetServer::initSrr(const std::string& queue)
 {
-    m_srrClient.reset(messagebus::MlmMessageBus(m_srrEndpoint, m_srrAgentName));
-    log_debug("New publisher client registered to endpoint %s with name %s", m_srrEndpoint.c_str(),
+    std::string endpoint{m_srrEndpoint};
+
+    log_debug("New publisher client registered to endpoint %s with name %s", endpoint.c_str(),
         (m_srrAgentName).c_str());
+
+    m_srrClient.reset(messagebus::MlmMessageBus(endpoint, m_srrAgentName));
 
     m_srrClient->connect();
 

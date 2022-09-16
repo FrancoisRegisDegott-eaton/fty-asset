@@ -778,7 +778,7 @@ static zmsg_t* s_publish_create_or_update_asset_msg(const std::string& client_na
     };
 
     // select basic info
-    [[maybe_unused]] int rv = select_asset_element_basic(asset_name, cb1, test_mode);
+    int rv = select_asset_element_basic(asset_name, cb1, test_mode);
     if (rv != 0) {
         log_warning("%s:\tCannot select info about '%s'", client_name.c_str(), asset_name.c_str());
         zhash_destroy(&aux);
@@ -923,7 +923,7 @@ static void s_sendto_create_or_update_asset(const fty::AssetServer& server, cons
         zmsg_addstr(msg, "ASSET_NOT_FOUND");
     }
     zmsg_pushstr(msg, uuid);
-    [[maybe_unused]] int rv = mlm_client_sendto(
+    int rv = mlm_client_sendto(
         const_cast<mlm_client_t*>(server.getMailboxClient()), address, subject.c_str(), NULL, 5000, &msg);
     if (rv != 0) {
         log_error(
@@ -1160,7 +1160,7 @@ static void s_update_topology(const fty::AssetServer& server, fty_proto_t* msg)
     // select assets, that were affected by the change
     std::set<std::string>    empty;
     std::vector<std::string> asset_names;
-    [[maybe_unused]] int rv = select_assets_by_container(fty_proto_name(msg), empty, asset_names, server.getTestMode());
+    int rv = select_assets_by_container(fty_proto_name(msg), empty, asset_names, server.getTestMode());
     if (rv != 0) {
         log_warning("%s:\tCannot select assets in container '%s'", server.getAgentName().c_str(),
             fty_proto_name(msg));
@@ -1186,7 +1186,7 @@ static void s_repeat_all(const fty::AssetServer& server, const std::set<std::str
     };
 
     // select all assets
-    [[maybe_unused]] int rv = select_assets(cb, server.getTestMode());
+    int rv = select_assets(cb, server.getTestMode());
     if (rv != 0) {
         log_warning("%s:\tCannot list all assets", server.getAgentName().c_str());
         return;
@@ -1217,41 +1217,45 @@ void handle_incoming_limitations(fty::AssetServer& server, fty_proto_t* metric)
 
 void fty_asset_server(zsock_t* pipe, void* args)
 {
-    assert (pipe);
-    assert (args);
+    if (!args) {
+        log_error("args is NULL");
+        return;
+    }
 
-    fty::AssetServer server;
-
-    server.setAgentName(static_cast<char*>(args));
     // new messagebus interfaces (-ng suffix)
+    fty::AssetServer server;
+    server.setAgentName(static_cast<char*>(args));
     server.setAgentNameNg(server.getAgentName() + "-ng");
+    // set-up SRR
     server.setSrrAgentName(server.getAgentName() + "-srr");
+    //server.initSrr(FTY_ASSET_SRR_QUEUE);
 
-    zpoller_t* poller =
-        zpoller_new(pipe, mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getMailboxClient())),
-            mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getStreamClient())), NULL);
+    zpoller_t* poller = zpoller_new(
+        pipe,
+        mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getMailboxClient())),
+        mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getStreamClient())),
+        NULL);
+    if (!poller) {
+        log_error("poller new failed");
+        return;
+    }
 
-    assert (poller);
-
-    // Signal need to be send as it is required by "actor_new"
-    zsock_signal(pipe, 0);
     log_info("%s:\tStarted", server.getAgentName().c_str());
 
-    // set-up SRR
-    server.initSrr(FTY_ASSET_SRR_QUEUE);
+    zsock_signal(pipe, 0);
 
     while (!zsys_interrupted) {
 
         const int POLL_TIMEOUT_S = 30;
         void* which = zpoller_wait(poller, POLL_TIMEOUT_S * 1000);
+
         if (which == NULL) {
             //log_debug("which = NULL");
             if (zpoller_terminated(poller) || zsys_interrupted)
                 break;
             continue;
         }
-
-        if (which == pipe) {
+        else if (which == pipe) {
             //log_debug("which = PIPE"); }
             zmsg_t* msg = zmsg_recv(pipe);
             char*   cmd = zmsg_popstr(msg);
@@ -1267,7 +1271,7 @@ void fty_asset_server(zsock_t* pipe, void* args)
                 server.setStreamEndpoint(endpoint);
 
                 char* stream_name = zsys_sprintf("%s-stream", server.getAgentName().c_str());
-                [[maybe_unused]] int rv          = mlm_client_connect(const_cast<mlm_client_t*>(server.getStreamClient()),
+                int rv = mlm_client_connect(const_cast<mlm_client_t*>(server.getStreamClient()),
                     server.getStreamEndpoint().c_str(), 1000, stream_name);
                 if (rv == -1) {
                     log_error("%s:\tCan't connect to malamute endpoint '%s'", stream_name,
@@ -1284,7 +1288,7 @@ void fty_asset_server(zsock_t* pipe, void* args)
             } else if (streq(cmd, "PRODUCER")) {
                 char* stream = zmsg_popstr(msg);
                 server.setTestMode(streq(stream, "ASSETS-TEST"));
-                [[maybe_unused]] int rv = mlm_client_set_producer(const_cast<mlm_client_t*>(server.getStreamClient()), stream);
+                int rv = mlm_client_set_producer(const_cast<mlm_client_t*>(server.getStreamClient()), stream);
                 if (rv == -1) {
                     log_error(
                         "%s:\tCan't set producer on stream '%s'", server.getAgentName().c_str(), stream);
@@ -1294,7 +1298,7 @@ void fty_asset_server(zsock_t* pipe, void* args)
             } else if (streq(cmd, "CONSUMER")) {
                 char* stream  = zmsg_popstr(msg);
                 char* pattern = zmsg_popstr(msg);
-                [[maybe_unused]] int rv      = mlm_client_set_consumer(
+                int rv = mlm_client_set_consumer(
                     const_cast<mlm_client_t*>(server.getStreamClient()), stream, pattern);
                 if (rv == -1) {
                     log_error("%s:\tCan't set consumer on stream '%s', '%s'", server.getAgentName().c_str(),
@@ -1306,8 +1310,9 @@ void fty_asset_server(zsock_t* pipe, void* args)
             } else if (streq(cmd, "CONNECTMAILBOX")) {
                 char* endpoint = zmsg_popstr(msg);
                 server.setMailboxEndpoint(endpoint);
+                server.setSrrEndpoint(endpoint);
 
-                [[maybe_unused]] int rv = mlm_client_connect(const_cast<mlm_client_t*>(server.getMailboxClient()),
+                int rv = mlm_client_connect(const_cast<mlm_client_t*>(server.getMailboxClient()),
                     server.getMailboxEndpoint().c_str(), 1000, server.getAgentName().c_str());
                 if (rv == -1) {
                     log_error("%s:\tCan't connect to malamute endpoint '%s'", server.getAgentName().c_str(),
@@ -1318,6 +1323,7 @@ void fty_asset_server(zsock_t* pipe, void* args)
                 server.createMailboxClientNg(); // queue
                 server.connectMailboxClientNg();
                 server.receiveMailboxClientNg(FTY_ASSET_MAILBOX);
+                server.initSrr(FTY_ASSET_SRR_QUEUE);
 
                 zstr_free(&endpoint);
                 zsock_signal(pipe, 0);
@@ -1333,7 +1339,8 @@ void fty_asset_server(zsock_t* pipe, void* args)
         }
         // This agent is a reactive agent, it reacts only on messages
         // and doesn't do anything if there are no messages
-        else if (which == mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getMailboxClient()))) {
+        else if (which == mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getMailboxClient())))
+        {
             zmsg_t* zmessage = mlm_client_recv(const_cast<mlm_client_t*>(server.getMailboxClient()));
             if (zmessage == NULL) {
                 continue;
@@ -1375,7 +1382,9 @@ void fty_asset_server(zsock_t* pipe, void* args)
                 log_info("%s:\tUnexpected subject '%s'", server.getAgentName().c_str(), subject);
             }
             zmsg_destroy(&zmessage);
-        } else if (which == mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getStreamClient()))) {
+        }
+        else if (which == mlm_client_msgpipe(const_cast<mlm_client_t*>(server.getStreamClient())))
+        {
             zmsg_t* zmessage = mlm_client_recv(const_cast<mlm_client_t*>(server.getStreamClient()));
             if (zmessage == NULL) {
                 continue;
@@ -1394,7 +1403,8 @@ void fty_asset_server(zsock_t* pipe, void* args)
                 fty_proto_destroy(&bmsg);
             }
             zmsg_destroy(&zmessage);
-        } else {
+        }
+        else {
             //log_debug("OTHER");
         }
     }
@@ -1407,7 +1417,7 @@ void fty_asset_server(zsock_t* pipe, void* args)
 //  Self test of this class
 
 // stores correlationID : asset JSON for each message received
-std::map<std::string, std::string> assetTestMap;
+static std::map<std::string, std::string> assetTestMap;
 
 static void test_asset_mailbox_handler(const messagebus::Message& msg)
 {
@@ -1462,6 +1472,8 @@ static void test_asset_mailbox_handler(const messagebus::Message& msg)
     }
 }
 
+//selftest main
+
 void fty_asset_server_test(bool /*verbose*/)
 {
     log_debug("Setting test mode to true");
@@ -1471,39 +1483,43 @@ void fty_asset_server_test(bool /*verbose*/)
 
     //  @selftest
     // Test #1:  Simple create/destroy test
+    std::cout << "fty-asset-server-test:Test #1" << std::endl;
     {
-        log_debug("fty-asset-server-test:Test #1");
         fty::AssetServer server;
-        log_info("fty-asset-server-test:Test #1: OK");
+    }
+    std::cout << "fty-asset-server-test:Test #1: OK" << std::endl;
+
+    std::string rnd_name = "1234";
+    {
+        timeval t;
+        gettimeofday(&t, NULL);
+        srand(static_cast<unsigned int>(t.tv_sec * t.tv_usec));
+        std::cerr << "################### " << t.tv_sec * t.tv_usec << std::endl;
+        rnd_name = std::to_string(rand());
     }
 
-    timeval t;
-    gettimeofday(&t, NULL);
-    srand(static_cast<unsigned int>(t.tv_sec * t.tv_usec));
+    const std::string endpoint = "inproc://fty_asset_server-test";
+    const std::string client_name = "fty-asset-" + rnd_name;
+    const std::string asset_server_test_name = "asset_agent_test-" + rnd_name;
+    std::cout << "endpoint: " << endpoint << std::endl;
+    std::cout << "client_name: " << client_name << std::endl;
+    std::cout << "asset_server_test_name: " << asset_server_test_name << std::endl;
 
-    std::cerr << "################### " << t.tv_sec * t.tv_usec << std::endl;
-    int rnd_name = rand();
-
-    std::string endpoint = "inproc://fty_asset_server-test";
-
+    std::cout << "create server..." << std::endl;
     zactor_t* server = zactor_new(mlm_server, static_cast<void*>( const_cast<char*>("Malamute")));
     assert (server != NULL);
     zstr_sendx(server, "BIND", endpoint.c_str(), NULL);
 
+    std::cout << "create ui..." << std::endl;
     mlm_client_t* ui = mlm_client_new();
-
-    std::string client_name = "fty-asset-";
-    client_name.append(std::to_string(rnd_name));
-
+    assert(ui != NULL);
     mlm_client_connect(ui, endpoint.c_str(), 5000, client_name.c_str());
     mlm_client_set_producer(ui, "ASSETS-TEST");
     mlm_client_set_consumer(ui, "ASSETS-TEST", ".*");
 
-    std::string asset_server_test_name = "asset_agent_test-";
-    asset_server_test_name.append(std::to_string(rnd_name));
-
+    std::cout << "create asset_server..." << std::endl;
     zactor_t* asset_server = zactor_new(fty_asset_server, static_cast<void*>( const_cast<char*>(asset_server_test_name.c_str())));
-
+    assert(asset_server != NULL);
     zstr_sendx(asset_server, "CONNECTSTREAM", endpoint.c_str(), NULL);
     zsock_wait(asset_server);
     zstr_sendx(asset_server, "PRODUCER", "ASSETS-TEST", NULL);
@@ -1526,7 +1542,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zhash_insert(aux, "subtype", static_cast<void*>( const_cast<char*>("N_A")));
         zmsg_t* msg = fty_proto_encode_asset(aux, asset_name, FTY_PROTO_ASSET_OP_CREATE, NULL);
         zmsg_pushstrf(msg, "%s", "READWRITE");
-        [[maybe_unused]] int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
+        int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
         zhash_destroy(&aux);
         assert (rv == 0);
         zmsg_t* reply = mlm_client_recv(ui);
@@ -1579,7 +1595,7 @@ void fty_asset_server_test(bool /*verbose*/)
     {
         log_debug("fty-asset-server-test:Test #3");
         zmsg_t* msg = fty_proto_encode_asset(NULL, asset_name, FTY_PROTO_ASSET_OP_UPDATE, NULL);
-        [[maybe_unused]] int rv  = mlm_client_send(ui, "update-test", &msg);
+        int rv  = mlm_client_send(ui, "update-test", &msg);
         assert (rv == 0);
         zclock_sleep(200);
         log_info("fty-asset-server-test:Test #3: OK");
@@ -1596,7 +1612,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_addstr(msg, uuid);
         zmsg_addstr(msg, command);
         zmsg_addstr(msg, asset_name);
-        [[maybe_unused]] int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
+        int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
         assert (rv == 0);
         zmsg_t* reply = mlm_client_recv(ui);
         assert (streq(mlm_client_subject(ui), subject));
@@ -1627,7 +1643,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_t*     msg     = zmsg_new();
         zmsg_addstr(msg, command);
         zmsg_addstr(msg, asset_name);
-        [[maybe_unused]] int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
+        int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
         assert (rv == 0);
         zmsg_t* reply = mlm_client_recv(ui);
         assert (streq(mlm_client_subject(ui), subject));
@@ -1647,7 +1663,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_addstr(msg, command);
         zmsg_addstr(msg, "UUID");
         zmsg_addstr(msg, asset_name);
-        [[maybe_unused]] int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
+        int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
         assert (rv == 0);
         zmsg_t* reply = mlm_client_recv(ui);
         assert (streq(mlm_client_subject(ui), subject));
@@ -1665,7 +1681,7 @@ void fty_asset_server_test(bool /*verbose*/)
     {
         log_debug("fty-asset-server-test:Test #7");
         const char* command = "REPEAT_ALL";
-        [[maybe_unused]] int rv      = zstr_sendx(asset_server, command, NULL);
+        int rv      = zstr_sendx(asset_server, command, NULL);
         assert (rv == 0);
         zclock_sleep(200);
         log_info("fty-asset-server-test:Test #7: OK");
@@ -1676,7 +1692,7 @@ void fty_asset_server_test(bool /*verbose*/)
         const char* subject = "REPUBLISH";
         zmsg_t*     msg     = zmsg_new();
         zmsg_addstr(msg, "$all");
-        [[maybe_unused]] int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
+        int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
         assert (rv == 0);
         zclock_sleep(200);
         log_info("fty-asset-server-test:Test #8: OK");
@@ -1691,14 +1707,14 @@ void fty_asset_server_test(bool /*verbose*/)
         zmsg_addstr(msg, command);
         zmsg_addstr(msg, uuid);
         zmsg_addstr(msg, asset_name);
-        [[maybe_unused]] int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
+        int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
         assert (rv == 0);
         zmsg_t* reply    = mlm_client_recv(ui);
         char*   rcv_uuid = zmsg_popstr(reply);
         assert (0 == strcmp(rcv_uuid, uuid));
         assert (fty_proto_is(reply));
         fty_proto_t* freply = fty_proto_decode(&reply);
-        [[maybe_unused]] const char*  str    = fty_proto_name(freply);
+        const char*  str    = fty_proto_name(freply);
         // assert (streq(str, asset_name));
         str = fty_proto_operation(freply);
         assert (streq(str, FTY_PROTO_ASSET_OP_UPDATE));
@@ -1713,11 +1729,11 @@ void fty_asset_server_test(bool /*verbose*/)
         const char* subject     = "ENAME_FROM_INAME";
         zmsg_t*     msg         = zmsg_new();
         zmsg_addstr(msg, asset_name);
-        [[maybe_unused]] int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
+        int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
         assert (rv == 0);
         zmsg_t* reply = mlm_client_recv(ui);
         assert (zmsg_size(reply) == 2);
-        [[maybe_unused]] char* str = zmsg_popstr(reply);
+        char* str = zmsg_popstr(reply);
         assert (streq(str, "OK"));
         zstr_free(&str);
         str = zmsg_popstr(reply);
@@ -1738,7 +1754,7 @@ void fty_asset_server_test(bool /*verbose*/)
     {
         log_debug("fty-asset-server-test:Test #11");
         const char* command = "WAKEUP";
-        [[maybe_unused]] int rv      = zstr_sendx(autoupdate_server, command, NULL);
+        int rv      = zstr_sendx(autoupdate_server, command, NULL);
         assert (rv == 0);
         zclock_sleep(200);
         log_info("fty-asset-server-test:Test #11: OK");
@@ -1754,7 +1770,7 @@ void fty_asset_server_test(bool /*verbose*/)
         zhash_insert(aux, "subtype", static_cast<void*>( const_cast<char*>("N_A")));
         zmsg_t* msg = fty_proto_encode_asset(aux, asset_name, FTY_PROTO_ASSET_OP_CREATE, NULL);
         zmsg_pushstrf(msg, "%s", "READWRITE");
-        [[maybe_unused]] int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
+        int rv = mlm_client_sendto(ui, asset_server_test_name.c_str(), subject, NULL, 5000, &msg);
         zclock_sleep(200);
         zhash_destroy(&aux);
         assert (rv == 0);
