@@ -1419,8 +1419,28 @@ void fty_asset_server(zsock_t* pipe, void* args)
 // stores correlationID : asset JSON for each message received
 static std::map<std::string, std::string> assetTestMap;
 
-static void test_asset_mailbox_handler(const messagebus::Message& msg)
+// IMPORTANT NOTE:
+// here, we need privileges to write in DB (runtime)
+// we only logs succes or error... no catch2 macros here
+static void s_test_asset_mailbox_handler(const messagebus::Message& msg)
 {
+    std::function<std::string(const messagebus::Message&)> msg2str = [] (const messagebus::Message& m)
+    {
+        std::ostringstream oss;
+        oss << "metaData (" << m.metaData().size() << "):" << std::endl;
+        for (const auto& i : m.metaData()) {
+            oss << i.first << ": " << i.second << std::endl;
+        }
+        oss << "userData (" << m.userData().size() << "):" << std::endl;
+        for (const auto& s : m.userData()) {
+            oss << s << std::endl;
+        }
+        return oss.str();
+    };
+
+    std::cout << "s_test_asset_mailbox_handler" << std::endl;
+    std::cout << "msg: " << msg2str(msg) << std::endl;
+
     try {
         std::string msgSubject = msg.metaData().find(messagebus::Message::SUBJECT)->second;
         if (msgSubject == FTY_ASSET_SUBJECT_CREATE) {
@@ -1431,6 +1451,9 @@ static void test_asset_mailbox_handler(const messagebus::Message& msg)
             fty::Asset::fromJson(
                 assetTestMap.find(msg.metaData().find(messagebus::Message::CORRELATION_ID)->second)->second,
                 mapAsset);
+
+            std::cout << "msgAsset: " << std::endl << fty::Asset::toJson(msgAsset) << std::endl;
+            std::cout << "mapAsset: " << std::endl << fty::Asset::toJson(mapAsset) << std::endl;
 
             if (msgAsset.getInternalName() == mapAsset.getInternalName()) {
                 log_info("fty-asset-server-test:Test #15.1: OK");
@@ -1446,6 +1469,9 @@ static void test_asset_mailbox_handler(const messagebus::Message& msg)
                 assetTestMap.find(msg.metaData().find(messagebus::Message::CORRELATION_ID)->second)->second,
                 mapAsset);
 
+            std::cout << "msgAsset: " << std::endl << fty::Asset::toJson(msgAsset) << std::endl;
+            std::cout << "mapAsset: " << std::endl << fty::Asset::toJson(mapAsset) << std::endl;
+
             if (msgAsset.getInternalName() == mapAsset.getInternalName()) {
                 log_info("fty-asset-server-test:Test #15.2: OK");
             } else {
@@ -1453,10 +1479,12 @@ static void test_asset_mailbox_handler(const messagebus::Message& msg)
             }
         } else if (msgSubject == FTY_ASSET_SUBJECT_GET) {
             std::string assetJson = msg.userData().back();
-            fty::Asset  a;
-            fty::Asset::fromJson(assetJson, a);
+            fty::Asset  msgAsset;
+            fty::Asset::fromJson(assetJson, msgAsset);
 
-            std::string assetName = a.getInternalName();
+            std::cout << "msgAsset: " << std::endl << fty::Asset::toJson(msgAsset) << std::endl;
+
+            std::string assetName = msgAsset.getInternalName();
 
             if (assetTestMap.find(msg.metaData().find(messagebus::Message::CORRELATION_ID)->second)->second ==
                 assetName) {
@@ -1467,8 +1495,8 @@ static void test_asset_mailbox_handler(const messagebus::Message& msg)
         } else {
             log_error("fty-asset-server-test:Invalid subject %s", msgSubject.c_str());
         }
-    } catch (std::exception& e) {
-        log_error(e.what());
+    } catch (const std::exception& e) {
+        log_error("s_test_asset_mailbox_handler (e: %s)", e.what());
     }
 }
 
@@ -1785,7 +1813,6 @@ void fty_asset_server_test(bool /*verbose*/)
         }
         zmsg_destroy(&reply); // throw away stream message
 
-
         reply = mlm_client_recv(ui);
         if (!fty_proto_is(reply)) {
             assert (streq(mlm_client_subject(ui), subject));
@@ -1995,7 +2022,10 @@ void fty_asset_server_test(bool /*verbose*/)
         std::unique_ptr<messagebus::MessageBus> receiver(
             messagebus::MlmMessageBus(endpoint, FTY_ASSET_TEST_REC));
 
-        messagebus::Message msg;
+        publisher->connect();
+
+        receiver->connect();
+        receiver->receive(FTY_ASSET_TEST_Q, s_test_asset_mailbox_handler);
 
         // test asset
         fty::Asset asset;
@@ -2007,12 +2037,12 @@ void fty_asset_server_test(bool /*verbose*/)
         asset.setPriority(4);
         asset.setExtEntry("name", "Test asset");
 
-        publisher->connect();
+        std::cout << "asset: " << std::endl << fty::Asset::toJson(asset) << std::endl;
 
-        receiver->connect();
-        receiver->receive(FTY_ASSET_TEST_Q, test_asset_mailbox_handler);
+        messagebus::Message msg;
 
         // test create
+        msg.metaData().clear();
         msg.metaData().emplace(messagebus::Message::CORRELATION_ID, messagebus::generateUuid());
         msg.metaData().emplace(messagebus::Message::SUBJECT, FTY_ASSET_SUBJECT_CREATE);
         msg.metaData().emplace(messagebus::Message::FROM, FTY_ASSET_TEST_REC);
@@ -2020,6 +2050,9 @@ void fty_asset_server_test(bool /*verbose*/)
         msg.metaData().emplace(messagebus::Message::REPLY_TO, FTY_ASSET_TEST_Q);
         msg.metaData().emplace(METADATA_TRY_ACTIVATE, "true");
         msg.metaData().emplace(METADATA_NO_ERROR_IF_EXIST, "true");
+
+        msg.userData().clear();
+        msg.userData().push_back(fty::Asset::toJson(asset));
 
         assetTestMap.emplace(
             msg.metaData().find(messagebus::Message::CORRELATION_ID)->second, fty::Asset::toJson(asset));
@@ -2045,7 +2078,6 @@ void fty_asset_server_test(bool /*verbose*/)
         log_info("fty-asset-server-test:Test #15.2: send UPDATE message");
         publisher->sendRequest(FTY_ASSET_MAILBOX, msg);
         zclock_sleep(200);
-
         // test get
         msg.metaData().clear();
         msg.metaData().emplace(messagebus::Message::CORRELATION_ID, messagebus::generateUuid());
