@@ -556,7 +556,7 @@ db_reply_t
     m_dvc_id_t monitor_element_id = 0;
     {
         // find monitor counterpart
-        [[maybe_unused]] int rv = DBAssets::convert_asset_to_monitor(conn, element_id, monitor_element_id);
+        int rv = DBAssets::convert_asset_to_monitor(conn, element_id, monitor_element_id);
         if ( rv != 0 )
         {
             db_reply_t ret = db_reply_new();

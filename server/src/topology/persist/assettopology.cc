@@ -490,8 +490,7 @@ zmsg_t* select_group_elements(
                                   select();
 
         log_debug("rows selected %u", result.size());
-        int i = 0;
-        [[maybe_unused]] int rv = 0;
+        int rv = 0;
 
         _scoped_zmsg_t* dcss     = zmsg_new();
         _scoped_zmsg_t* roomss   = zmsg_new();
@@ -499,6 +498,7 @@ zmsg_t* select_group_elements(
         _scoped_zmsg_t* rackss   = zmsg_new();
         _scoped_zmsg_t* devicess = zmsg_new();
 
+        int i = 0;
         for ( auto &row: result )
         {
             i++;

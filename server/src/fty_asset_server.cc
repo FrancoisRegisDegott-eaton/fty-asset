@@ -1421,7 +1421,7 @@ static std::map<std::string, std::string> assetTestMap;
 
 // IMPORTANT NOTE:
 // here, we need privileges to write in DB (runtime)
-// we only logs succes or error... no catch2 macros here
+// we only logs success or error... no catch2/assert macros here
 static void s_test_asset_mailbox_handler(const messagebus::Message& msg)
 {
     std::function<std::string(const messagebus::Message&)> msg2str = [] (const messagebus::Message& m)

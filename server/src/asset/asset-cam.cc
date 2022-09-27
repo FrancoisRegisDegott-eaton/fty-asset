@@ -31,7 +31,7 @@ std::list<CredentialMapping> getCredentialMappings(const ExtMap& extMap)
 
     log_debug("Looking for mapping entries");
 
-    auto findCredKey = [&] (const auto& el) {
+    auto findCredKey = [] (const auto& el) {
         return el.first.find(SECW_CRED_ID_KEY) != std::string::npos;
     };
 
@@ -56,6 +56,7 @@ std::list<CredentialMapping> getCredentialMappings(const ExtMap& extMap)
     }
 
     log_debug("Mapping entries found: %zu", credentialList.size());
+
     return credentialList;
 }
 
@@ -80,7 +81,7 @@ void deleteMappings(const std::string& assetInternalName)
             log_debug("Deleting mapping %s : %s", m.m_serviceId.c_str(), m.m_protocol.c_str());
             camAccessor.removeMapping(m.m_assetId, m.m_serviceId, m.m_protocol);
         }
-    } catch (std::exception& e) {
+    } catch (const std::exception& e) {
         log_error("Asset mappings could not be removed: %s", e.what());
     }
 }
@@ -97,7 +98,7 @@ void deleteAllMappings(const std::string& assetInternalName)
             log_debug("Deleting mapping %s : %s (%s)", m.m_serviceId.c_str(), m.m_protocol.c_str(), m.m_serviceId.c_str());
             camAccessor.removeMapping(m.m_assetId, m.m_serviceId, m.m_protocol);
         }
-    } catch (std::exception& e) {
+    } catch (const std::exception& e) {
         log_error("Asset mappings could not be removed: %s", e.what());
     }
 }

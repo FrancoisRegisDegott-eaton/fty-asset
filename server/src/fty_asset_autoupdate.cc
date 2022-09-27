@@ -27,7 +27,7 @@
 */
 
 #include "fty_asset_autoupdate.h"
-#include "dns.h"
+#include "dns.h" //local_addresses
 
 #include <fty_log.h>
 #include <fty_proto.h>
@@ -49,15 +49,17 @@ struct fty_asset_autoupdate_t {
 //  --------------------------------------------------------------------------
 //  Destroy the fty_asset_autoupdate
 
-void
+static void
 fty_asset_autoupdate_destroy (fty_asset_autoupdate_t **self_p)
 {
     if (self_p && *self_p) {
         fty_asset_autoupdate_t *self = *self_p;
+
         zstr_free (&self->name);
         zstr_free (&self->asset_agent_name);
         mlm_client_destroy (&self->client);
-        free (self);
+
+        delete self;
         *self_p = NULL;
     }
 }
@@ -65,10 +67,10 @@ fty_asset_autoupdate_destroy (fty_asset_autoupdate_t **self_p)
 //  --------------------------------------------------------------------------
 //  Create a new fty_asset_autoupdate
 
-fty_asset_autoupdate_t *
+static fty_asset_autoupdate_t *
 fty_asset_autoupdate_new (void)
 {
-    fty_asset_autoupdate_t *self = (fty_asset_autoupdate_t *) zmalloc (sizeof (*self));
+    fty_asset_autoupdate_t *self = new (fty_asset_autoupdate_t); //due to std::vector<>
     if (!self) {
         return NULL;
     }
@@ -85,20 +87,24 @@ fty_asset_autoupdate_new (void)
 #define is_ipv6(X) (X.find(':') != std::string::npos)
 #define icase_streq(X,Y) (strcasecmp ((X),(Y)) == 0)
 
-void
+static void
 autoupdate_update_rc_self (fty_asset_autoupdate_t *self, const std::string &assetName)
 {
-    bool haveLAN1 = false;
+    if (!self) return;
+
     zhash_t *inventory = zhash_new ();
     zhash_t *aux = zhash_new ();
-    std::string key, topic;
 
     zhash_autofree (inventory);
     zhash_autofree (aux);
+
     zhash_update (aux, "time", static_cast<void*>( const_cast<char*>(std::to_string (zclock_time () / 1000).c_str ())));
 
+    std::string key, topic;
     auto ifaces = local_addresses();
-    haveLAN1 = (ifaces.find ("LAN1") != ifaces.cend ());
+
+    bool haveLAN1 = (ifaces.find ("LAN1") != ifaces.cend ());
+
     if (haveLAN1) {
         // hopefully running on RC
         int ipv4index = 0;
@@ -160,10 +166,10 @@ autoupdate_update_rc_self (fty_asset_autoupdate_t *self, const std::string &asse
     zhash_destroy (&aux);
 }
 
-void
+static void
 autoupdate_update_rc_information (fty_asset_autoupdate_t *self)
 {
-    assert (self);
+    if (!self) return;
 
     if (self->rcs.empty() )
         return;
@@ -203,10 +209,10 @@ autoupdate_update_rc_information (fty_asset_autoupdate_t *self)
     }
 }
 
-void
+static void
 autoupdate_request_all_rcs (fty_asset_autoupdate_t *self)
 {
-    assert (self);
+    if (!self) return;
 
     if ( self->verbose)
         log_debug ("%s:\tRequest RC list", self->name);
@@ -221,14 +227,13 @@ autoupdate_request_all_rcs (fty_asset_autoupdate_t *self)
     zmsg_destroy (&msg);
 }
 
-void
+static void
 autoupdate_update (fty_asset_autoupdate_t *self)
 {
-    assert (self);
     autoupdate_update_rc_information (self);
 }
 
-void
+static void
 autoupdate_handle_message (fty_asset_autoupdate_t *self, zmsg_t *message)
 {
     if (!self || !message ) return;
@@ -258,38 +263,42 @@ autoupdate_handle_message (fty_asset_autoupdate_t *self, zmsg_t *message)
     }
 }
 
-
 void
 fty_asset_autoupdate_server (zsock_t *pipe, void *args)
 {
-    assert (pipe);
-    assert (args);
+    assert(args);
 
     fty_asset_autoupdate_t *self = fty_asset_autoupdate_new ();
-    assert (self);
-    self->name = strdup (static_cast<char*>(args));
-    assert (self->name);
+    if (!self) {
+        log_error("fty_asset_autoupdate_new failed");
+        return;
+    }
 
     zpoller_t *poller = zpoller_new (pipe, mlm_client_msgpipe(self->client), NULL);
-    assert (poller);
+    if (!poller) {
+        log_error("zpoller_new failed");
+        fty_asset_autoupdate_destroy (&self);
+        return;
+    }
+
+    self->name = strdup (static_cast<char*>(args));
 
     // Signal need to be send as it is required by "actor_new"
     zsock_signal (pipe, 0);
+
     log_info ("%s:\tStarted", self->name);
 
     while (!zsys_interrupted) {
         void *which = zpoller_wait (poller, -1);
-        if ( !which ) {
-            // cannot expire as waiting until infinity
-            // so it is interrupted
-            continue;
+        if (which == NULL) {
+            if (zpoller_terminated(poller) || zsys_interrupted) {
+                break;
+            }
         }
-        if (which == pipe) {
+        else if (which == pipe) {
             zmsg_t *msg = zmsg_recv (pipe);
             char *cmd = zmsg_popstr (msg);
-            if ( self->verbose ) {
-                log_debug ("%s:\tActor command=%s", self->name, cmd);
-            }
+            log_debug ("%s:\tActor command=%s", self->name, cmd);
 
             if (streq (cmd, "$TERM")) {
                 if ( !self->verbose ) // ! is here intentionally, to get rid of duplication information
@@ -305,7 +314,7 @@ fty_asset_autoupdate_server (zsock_t *pipe, void *args)
             else
             if (streq (cmd, "CONNECT")) {
                 char* endpoint = zmsg_popstr (msg);
-                [[maybe_unused]] int rv = mlm_client_connect (self->client, endpoint, 1000, self->name);
+                int rv = mlm_client_connect (self->client, endpoint, 1000, self->name);
                 if (rv == -1) {
                     log_error ("%s:\tCan't connect to malamute endpoint '%s'", self->name, endpoint);
                 }
@@ -315,7 +324,7 @@ fty_asset_autoupdate_server (zsock_t *pipe, void *args)
             else
             if (streq (cmd, "PRODUCER")) {
                 char* stream = zmsg_popstr (msg);
-                [[maybe_unused]] int rv = mlm_client_set_producer (self->client, stream);
+                int rv = mlm_client_set_producer (self->client, stream);
                 if (rv == -1) {
                     log_error ("%s:\tCan't set producer on stream '%s'", self->name, stream);
                 }
@@ -326,7 +335,7 @@ fty_asset_autoupdate_server (zsock_t *pipe, void *args)
             if (streq (cmd, "CONSUMER")) {
                 char* stream = zmsg_popstr (msg);
                 char* pattern = zmsg_popstr (msg);
-                [[maybe_unused]] int rv = mlm_client_set_consumer (self->client, stream, pattern);
+                int rv = mlm_client_set_consumer (self->client, stream, pattern);
                 if (rv == -1) {
                     log_error ("%s:\tCan't set consumer on stream '%s', '%s'", self->name, stream, pattern);
                 }
@@ -344,15 +353,13 @@ fty_asset_autoupdate_server (zsock_t *pipe, void *args)
                 zstr_free(&self->asset_agent_name);
                 self->asset_agent_name = name;
             }
-            else
-            {
+            else {
                 log_info ("%s:\tUnhandled command %s", self->name, cmd);
             }
             zstr_free (&cmd);
             zmsg_destroy (&msg);
-            continue;
         }
-        if (which == mlm_client_msgpipe(self->client)) {
+        else if (which == mlm_client_msgpipe(self->client)) {
             zmsg_t *zmessage = mlm_client_recv (self->client);
             autoupdate_handle_message (self, zmessage);
             zmsg_destroy (&zmessage);
@@ -360,6 +367,7 @@ fty_asset_autoupdate_server (zsock_t *pipe, void *args)
     }
 
     log_info ("%s:\tended", self->name);
+
     zpoller_destroy (&poller);
     fty_asset_autoupdate_destroy (&self);
 }

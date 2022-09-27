@@ -68,8 +68,6 @@ static constexpr const char* FTY_ASSET_SRR_AGENT = "asset-agent-srr";
 static constexpr const char* FTY_ASSET_SRR_NAME  = "asset-agent";
 static constexpr const char* FTY_ASSET_SRR_QUEUE = "FTY.Q.ASSET.SRR";
 
-//typedef struct _mlm_client_t mlm_client_t;
-
 namespace messagebus {
 class MessageBus;
 class Message;

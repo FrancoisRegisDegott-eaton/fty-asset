@@ -19,6 +19,7 @@
     =========================================================================
 */
 
+// won't compile main() for unit testing
 #ifndef _UNIT_TESTS_COMPILATION_
 
 /*
@@ -42,11 +43,11 @@
 #define WAKEUP "WAKEUP"
 #define REPEAT_ALL "REPEAT_ALL"
 
-static void s_usage()
+static void s_usage(const char* pname)
 {
-    puts ("fty-asset [options] ...");
-    puts ("  --verbose / -v   verbose output");
-    puts ("  --help / -h      this information");
+    printf ("%s [options] ...\n", pname);
+    printf ("  --verbose / -v   verbose output\n");
+    printf ("  --help / -h      this information\n");
 }
 
 static int s_wakeup_timer (zloop_t * /*loop*/, int /*timer_id*/, void *output)
@@ -68,14 +69,16 @@ int main (int argc, char *argv [])
     for (int argn = 1; argn < argc; argn++) {
         const char* arg = argv [argn];
         if (streq (arg, "--help") || streq (arg, "-h")) {
-            s_usage();
+            s_usage(argv[0]);
             return EXIT_SUCCESS;
         }
         else if (streq (arg, "--verbose") || streq (arg, "-v")) {
             verbose = true;
         }
         else {
-            printf ("Unknown option (%s)\n", arg);
+            fprintf (stderr, "Unknown option (%s)\n", arg);
+            s_usage(argv[0]);
+            return EXIT_FAILURE;
         }
     }
 
