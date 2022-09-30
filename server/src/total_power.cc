@@ -27,14 +27,15 @@
 */
 
 #include "total_power.h"
-
 #include "asset/dbhelpers.h"
+
+#include <fty_log.h>
+#include <fty_common.h>
+
 #include <tntdb/connect.h>
 #include <tntdb/result.h>
 #include <tntdb/error.h>
 #include <exception>
-#include <fty_log.h>
-#include <fty_common.h>
 
 class ShortAssetInfo {
 public:
@@ -397,8 +398,10 @@ int
         bool test
     )
 {
-    if (test)
+    if (test) {
+        log_debug("[select_devices_total_power]: runs in test mode");
         return 0;
+    }
 
     tntdb::Connection conn = tntdb::connectCached (DBConn::url);
     int64_t assetId = DBAssets::name_to_asset_id (assetName);
@@ -406,11 +409,4 @@ int
         return static_cast<int>(assetId);
     }
     return select_total_power_by_id (conn, static_cast<uint32_t>(assetId), powerDevices);
-}
-
-void
-total_power_test (bool /*verbose*/)
-{
-    printf (" * total_power: ");
-    printf ("OK\n");
 }

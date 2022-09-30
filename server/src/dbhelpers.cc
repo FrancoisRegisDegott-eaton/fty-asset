@@ -26,13 +26,12 @@
 @end
 */
 
-
 #include "asset/dbhelpers.h"
+#include "test_str.h"
 
-#include "fty_proto.h"
-#include "fty_asset_dto.h"
-#include "fty_asset_server.h"
 #include <fty_log.h>
+#include <fty_proto.h>
+#include <fty_asset_dto.h>
 #include <cxxtools/jsonserializer.h>
 
 #define INPUT_POWER_CHAIN     1
@@ -55,10 +54,13 @@ std::map<std::string, std::string> test_map_asset_state;
 int select_assets_by_container(const std::string& container_name, const std::set<std::string>& filter,
     std::vector<std::string>& assets, bool test)
 {
-    if (test)
+    if (test) {
+        log_debug("[select_assets_by_container]: runs in test mode");
         return 0;
+    }
+
     tntdb::Connection conn = tntdb::connectCached(DBConn::url);
-    [[maybe_unused]] int rv = DBAssets::select_assets_by_container_name_filter(conn, container_name, filter, assets);
+    int rv = DBAssets::select_assets_by_container_name_filter(conn, container_name, filter, assets);
     return rv;
 }
 
@@ -75,8 +77,11 @@ int select_assets_by_container(const std::string& container_name, const std::set
 int select_asset_element_basic(
     const std::string& asset_name, std::function<void(const tntdb::Row&)> cb, bool test)
 {
-    if (test)
+    if (test) {
+        log_debug("[select_asset_element_basic]: runs in test mode");
         return 0;
+    }
+
     tntdb::Connection conn = tntdb::connectCached(DBConn::url);
     int               rv   = DBAssets::select_asset_element_basic_cb(conn, asset_name, cb);
     return rv;
@@ -94,10 +99,13 @@ int select_asset_element_basic(
  */
 int select_ext_attributes(uint32_t asset_id, std::function<void(const tntdb::Row&)> cb, bool test)
 {
-    if (test)
+    if (test) {
+        log_debug("[select_ext_attributes]: runs in test mode");
         return 0;
+    }
+
     tntdb::Connection conn = tntdb::connectCached(DBConn::url);
-    int               rv   = DBAssets::select_ext_attributes_cb(conn, asset_id, cb);
+    int rv = DBAssets::select_ext_attributes_cb(conn, asset_id, cb);
     return rv;
 }
 
@@ -113,10 +121,13 @@ int select_ext_attributes(uint32_t asset_id, std::function<void(const tntdb::Row
  */
 int select_asset_element_super_parent(uint32_t id, std::function<void(const tntdb::Row&)>& cb, bool test)
 {
-    if (test)
+    if (test) {
+        log_debug("[select_asset_element_super_parent]: runs in test mode");
         return 0;
+    }
+
     tntdb::Connection conn = tntdb::connectCached(DBConn::url);
-    int               rv   = DBAssets::select_asset_element_super_parent(conn, id, cb);
+    int rv = DBAssets::select_asset_element_super_parent(conn, id, cb);
     return rv;
 }
 
@@ -128,11 +139,13 @@ int select_asset_element_super_parent(uint32_t id, std::function<void(const tntd
  */
 int select_assets_by_filter(const std::set<std::string>& filter, std::vector<std::string>& assets, bool test)
 {
-    if (test)
+    if (test) {
+        log_debug("[select_assets_by_filter]: runs in test mode");
         return 0;
+    }
 
     tntdb::Connection conn = tntdb::connectCached(DBConn::url);
-    int               rv   = DBAssets::select_assets_by_filter(conn, filter, assets);
+    int rv = DBAssets::select_assets_by_filter(conn, filter, assets);
     return rv;
 }
 
@@ -147,10 +160,13 @@ int select_assets_by_filter(const std::set<std::string>& filter, std::vector<std
  */
 int select_assets(std::function<void(const tntdb::Row&)>& cb, bool test)
 {
-    if (test)
+    if (test) {
+        log_debug("[select_assets]: runs in test mode");
         return 0;
+    }
+
     tntdb::Connection conn = tntdb::connectCached(DBConn::url);
-    int               rv   = DBAssets::select_assets_cb(conn, cb);
+    int rv = DBAssets::select_assets_cb(conn, cb);
     return rv;
 }
 
@@ -168,6 +184,7 @@ int select_assets(std::function<void(const tntdb::Row&)>& cb, bool test)
     "       value = VALUES (value),"                                                                         \
     "       read_only = :readonly,"                                                                          \
     "       id_asset_ext_attribute = LAST_INSERT_ID(id_asset_ext_attribute)"
+
 /**
  *  \brief Inserts ext attributes from inventory message into DB
  *
@@ -182,8 +199,11 @@ int select_assets(std::function<void(const tntdb::Row&)>& cb, bool test)
 int process_insert_inventory(
     const std::string& device_name, zhash_t* ext_attributes, bool readonly, bool test)
 {
-    if (test)
+    if (test) {
+        log_debug("[process_insert_inventory]: runs in test mode");
         return 0;
+    }
+
     if (!ext_attributes || (zhash_size(ext_attributes) == 0))
         return 0;
 
@@ -245,8 +265,11 @@ int process_insert_inventory(
 int process_insert_inventory(const std::string& device_name, zhash_t* ext_attributes, bool readonly,
     std::unordered_map<std::string, std::string>& map_cache, bool test)
 {
-    if (test)
+    if (test) {
+        log_debug("[process_insert_inventory]: runs in test mode");
         return 0;
+    }
+
     if (!ext_attributes || (zhash_size(ext_attributes) == 0))
         return 0;
 
@@ -303,14 +326,15 @@ int process_insert_inventory(const std::string& device_name, zhash_t* ext_attrib
 int select_ename_from_iname(std::string& iname, std::string& ename, bool test)
 {
     if (test) {
+        log_debug("[select_ename_from_iname]: runs in test mode");
         if (iname == TEST_INAME) {
             ename = TEST_ENAME;
             return 0;
-        } else
-            return -1;
+        }
+        return -1;
     }
-    try {
 
+    try {
         tntdb::Connection conn = tntdb::connectCached(DBConn::url);
         tntdb::Statement  st   = conn.prepareCached(
             "SELECT e.value FROM  t_bios_asset_ext_attributes AS e "
@@ -324,12 +348,12 @@ int select_ename_from_iname(std::string& iname, std::string& ename, bool test)
         log_debug("[s_handle_subject_ename_from_iname]: were selected %" PRIu32 " rows", 1);
 
         row[0].get(ename);
-    } catch (const std::exception& e) {
-        log_error("exception caught %s for element '%s'", e.what(), ename.c_str());
-        return -1;
+        return 0;
     }
-
-    return 0;
+    catch (const std::exception& e) {
+        log_error("exception caught %s for element '%s'", e.what(), ename.c_str());
+    }
+    return -1;
 }
 
 
@@ -341,9 +365,9 @@ int select_ename_from_iname(std::string& iname, std::string& ename, bool test)
 
 int get_active_power_devices(bool test)
 {
-    int count = 0;
     if (test) {
         log_debug("[get_active_power_devices]: runs in test mode");
+        int count = 0;
         for (auto const& as : test_map_asset_state) {
             if ("active" == as.second) {
                 ++count;
@@ -351,6 +375,7 @@ int get_active_power_devices(bool test)
         }
         return count;
     }
+
     tntdb::Connection conn = tntdb::connectCached(DBConn::url);
     return DBAssets::get_active_power_devices(conn);
 }

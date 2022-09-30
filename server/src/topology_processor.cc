@@ -31,14 +31,13 @@
 #include "topology_location.h"
 #include "topology_input_powerchain.h"
 
+#include <fty_log.h>
+#include <fty_common.h>
+
 #include <cxxtools/serializationinfo.h>
 #include <cxxtools/jsondeserializer.h>
 #include <cxxtools/jsonserializer.h>
 #include <map>
-
-#include <fty_log.h>
-#include <fty_common.h>
-
 
 // fwd decl.
 static int json_string_beautify (std::string & s);
@@ -383,31 +382,4 @@ static int si_member_value (const cxxtools::SerializationInfo & si, const std::s
     if (!m || m->isNull()) return -1;
     m->getValue(value);
     return 0; // ok
-}
-
-//  --------------------------------------------------------------------------
-//  Self test of this class
-
-// If your selftest reads SCMed fixture data, please keep it in
-// src/selftest-ro; if your test creates filesystem objects, please
-// do so under src/selftest-rw.
-// The following pattern is suggested for C selftest code:
-//    char *filename = NULL;
-//    filename = zsys_sprintf ("%s/%s", SELFTEST_DIR_RO, "mytemplate.file");
-//    assert (filename);
-//    ... use the "filename" for I/O ...
-//    zstr_free (&filename);
-// This way the same "filename" variable can be reused for many subtests.
-#define SELFTEST_DIR_RO "src/selftest-ro"
-#define SELFTEST_DIR_RW "src/selftest-rw"
-
-void
-topology_processor_test (bool /*verbose*/)
-{
-    printf (" * topology_processor: \n");
-
-    //  @selftest
-    //  @end
-
-    printf ("topology_processor: OK\n");
 }

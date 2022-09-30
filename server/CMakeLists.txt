@@ -8,8 +8,8 @@ file(GLOB_RECURSE SOURCES_FILES src/*.cc)
 etn_target(exe ${PROJECT_NAME}-server
     SOURCES
         ${SOURCES_FILES}
-
     INCLUDE_DIRS
+        include
         src
         src/topology
         src/topology/db
@@ -18,13 +18,9 @@ etn_target(exe ${PROJECT_NAME}-server
         src/topology/shared
         src/asset
         src/asset/conversion
-        include
-    USES_PUBLIC
-        fty_common
     USES_PRIVATE
         ${PROJECT_NAME}
         ${PROJECT_NAME}-libng
-        cxxtools
         fty_common
         fty_common_db
         fty_common_logging
@@ -39,9 +35,10 @@ etn_target(exe ${PROJECT_NAME}-server
         czmq
         mlm
         protobuf
+        cxxtools
 )
 
-#install stystemd config
+#install systemd service file
 
 configure_file(fty-asset.service.in
   "${PROJECT_BINARY_DIR}/fty-asset.service" @ONLY)
@@ -51,5 +48,25 @@ install(FILES
   DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/systemd/system/
 )
 
-
 ##############################################################################################################
+
+etn_test_target(${PROJECT_NAME}-server
+    CONFIGS
+        tests/selftest-ro/*
+    SOURCES
+        tests/main.cc
+        tests/fty_asset_selftest.cc
+    INCLUDE_DIRS
+        include
+        src/
+        src/topology
+        src/topology/db
+        src/topology/msg
+        src/topology/persist
+        src/topology/shared
+        src/asset
+        src/asset/conversion
+    PREPROCESSOR
+        -D_UNIT_TESTS_COMPILATION_
+        -DCATCH_CONFIG_FAST_COMPILE
+)
