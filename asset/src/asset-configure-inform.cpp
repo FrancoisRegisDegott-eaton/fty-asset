@@ -129,8 +129,9 @@ Expected<void> sendConfigure(
         std::string dc_name;
 
         auto cb = [aux, &dc_name](const fty::db::Row& row) {
-            static const std::vector<std::string> names({"parent_name1", "parent_name2", "parent_name3", "parent_name4", "parent_name5",
-                     "parent_name6", "parent_name7", "parent_name8", "parent_name9", "parent_name10"});
+            static const std::vector<std::string> names({"parent_name1", "parent_name2", "parent_name3",
+                "parent_name4", "parent_name5", "parent_name6",
+                "parent_name7", "parent_name8", "parent_name9", "parent_name10"});
 
             for (const auto& name : names) {
                 std::string foo = row.get(name);
@@ -160,6 +161,7 @@ Expected<void> sendConfigure(
         zhash_destroy(&aux);
 
         r = mlm_client_send(client, subject.c_str(), &msg);
+        zmsg_destroy(&msg);
         if (r != 0) {
             mlm_client_destroy(&client);
             return unexpected("mlm_client_send () failed.");
@@ -176,23 +178,23 @@ Expected<void> sendConfigure(
             if (r != 0) {
                 log_error("sendto %s REPUBLISH %s failed.", AGENT_FTY_ASSET, s_asset_name.c_str());
             }
-            //FIXME consume the response ?!
+            //no response expected
         }
 
         // data for uptime
         if (oneRow.first.subtypeId == persist::asset_subtype::UPS) {
             zhash_t* aux1 = zhash_new();
             zhash_autofree(aux1);
-            if (!getDcUPSes(conn, dc_name, aux1))
+            if (!getDcUPSes(conn, dc_name, aux1)) {
                 log_error("Cannot read upses for dc with id = %s", dc_name.c_str());
+            }
 
             zhash_update(aux1, "type", reinterpret_cast<void*>(const_cast<char*>("datacenter")));
 
             zmsg_t* msg1 = fty_proto_encode_asset(aux1, dc_name.c_str(), "inventory", nullptr);
             zhash_destroy(&aux1);
 
-            std::string subject1 = "datacenter.unknown@";
-            subject1.append(dc_name);
+            std::string subject1 = "datacenter.unknown@" + dc_name;
             r = mlm_client_send(client, subject1.c_str(), &msg1);
             zmsg_destroy(&msg1);
 
@@ -205,6 +207,7 @@ Expected<void> sendConfigure(
 
     zclock_sleep(500); // ensure that everything was send before we destroy the client
     mlm_client_destroy(&client);
+
     return {};
 }
 
@@ -216,15 +219,15 @@ Expected<void> sendConfigure(
 
 std::string generateMlmClientId(const std::string& client_name)
 {
-    std::string       name = client_name;
     std::stringstream ss;
     ss << std::this_thread::get_id();
     std::string pid = ss.str();
-    if (!pid.empty()) {
-        name += "." + pid;
+
+    if (pid.empty()) {
+        return client_name + "." + std::to_string(random());
     } else {
-        name += "." + std::to_string(random());
+        return client_name + "." + pid;
     }
-    return name;
 }
+
 } // namespace fty::asset
