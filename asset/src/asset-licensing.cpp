@@ -32,7 +32,7 @@ AssetExpected<LimitationsStruct> getLicensingLimitation()
     zmsg_addstr (request, "*");
     zmsg_addstr (request, "*");
 
-    int rv = client_ptr->sendto ("etn-licensing", "LIMITATION_QUERY", 1000, &request);
+    int rv = client_ptr->sendto ("etn-licensing", "LIMITATION_QUERY", 5, &request);
     zmsg_destroy (&request);
     if (rv == -1) {
         zuuid_destroy (&zuuid);
