@@ -53,29 +53,35 @@ static double s_rack_realpower_nominal(const std::string& name)
 
 std::string getJsonAsset(uint32_t elemId)
 {
-    std::string json;
     // Get informations from database
     auto tmp = AssetManager::getItem(elemId);
 
     if (!tmp) {
         log_error(tmp.error().toString().c_str());
-        return json;
+        return "";
+    }
+
+    std::string asset_ext_name;
+    {
+        std::pair<std::string, std::string> asset_names = DBAssets::id_to_name_ext_name(tmp->id);
+        if (asset_names.first.empty() && asset_names.second.empty()) {
+            log_error("Database failure");
+            return "";
+        }
+        asset_ext_name = asset_names.second; // asset friendly name
     }
 
     std::string parent_name;
     std::string ext_parent_name;
-    auto        parent_names = db::idToNameExtName(tmp->parentId);
-    if (parent_names) {
-        parent_name     = parent_names->first;
-        ext_parent_name = parent_names->second;
+    {
+        auto parent_names = db::idToNameExtName(tmp->parentId);
+        if (parent_names) {
+            parent_name     = parent_names->first; // parent assetId
+            ext_parent_name = parent_names->second; // parent friendly name
+        }
     }
 
-    std::pair<std::string, std::string> asset_names = DBAssets::id_to_name_ext_name(tmp->id);
-    if (asset_names.first.empty() && asset_names.second.empty()) {
-        log_error("Database failure");
-        return json;
-    }
-    std::string asset_ext_name = asset_names.second;
+    std::string json;
 
     json += "{";
 
@@ -113,8 +119,7 @@ std::string getJsonAsset(uint32_t elemId)
             std::pair<std::string, std::string> group_names = DBAssets::id_to_name_ext_name(oneGroup.first);
             if (group_names.first.empty() && group_names.second.empty()) {
                 log_error("Database failure");
-                json = "";
-                return json;
+                return "";
             }
             ext_name = group_names.second;
             json += "{";
@@ -141,8 +146,7 @@ std::string getJsonAsset(uint32_t elemId)
                 auto link_names = db::idToNameExtName(oneLink.srcId);
                 if (!link_names || (link_names->first.empty() && link_names->second.empty())) {
                     log_error("Database failure");
-                    json = "";
-                    return json;
+                    return "";
                 }
                 json += "{";
                 json += utils::json::jsonify("src_name", link_names->second) + ",";
@@ -185,8 +189,7 @@ std::string getJsonAsset(uint32_t elemId)
             std::pair<std::string, std::string> it_names = DBAssets::id_to_name_ext_name(std::get<0>(it));
             if (it_names.first.empty() && it_names.second.empty()) {
                 log_error("Database failure");
-                json = "";
-                return json;
+                return "";
             }
             ext_name = it_names.second;
             json += "{";
@@ -420,8 +423,7 @@ std::string getJsonAsset(uint32_t elemId)
         int                        rv = rack_outlets_available(tmp->id, res);
         if (rv != 0) {
             log_error("Database failure");
-            json = "";
-            return json;
+            return "";
         }
         size_t i = 1;
         for (const auto& it : res) {
@@ -437,6 +439,7 @@ std::string getJsonAsset(uint32_t elemId)
     } // rack
 
     json += "}}";
+
     return json;
 }
 

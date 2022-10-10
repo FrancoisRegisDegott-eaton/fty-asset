@@ -929,6 +929,7 @@ static void s_sendto_create_or_update_asset(const fty::AssetServer& server, cons
         log_error(
             "%s:\tmlm_client_send failed for asset '%s'", server.getAgentName().c_str(), asset_name.c_str());
     }
+    zmsg_destroy(&msg);
 }
 
 static void s_handle_subject_asset_detail(const fty::AssetServer& server, zmsg_t** zmessage_p)
