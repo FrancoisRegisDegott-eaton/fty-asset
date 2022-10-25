@@ -9,6 +9,7 @@
 #include <fty_common_db_connection.h>
 #include <fty_log.h>
 #include <iostream>
+#include <map>
 #include <sys/time.h>
 
 #define MAX_CREATE_RETRY 10
@@ -443,6 +444,8 @@ Expected<std::vector<WebAssetElement>> selectAssetElementsByType(uint16_t type_i
 
 // =====================================================================================================================
 
+// FIXME duplicate of asset/src/db/select.cpp/extAttributes()
+
 Expected<Attributes> selectExtAttributes(uint32_t elementId)
 {
     static const std::string sql = R"(
@@ -469,6 +472,16 @@ Expected<Attributes> selectExtAttributes(uint32_t elementId)
             row.get("read_only", val.readOnly);
 
             attrs.emplace(row.get("keytag"), val);
+        }
+
+        // IPMPROG-4490: [resilience]
+        // If no endpoint.1 port defined, set default related to the protocol
+        if ((attrs.count("endpoint.1.port") == 0) && (attrs.count("endpoint.1.protocol") != 0)) {
+            const std::map<std::string, std::string> map{{"nut_powercom", "443"}, {"nut_snmp", "161"}, {"nut_xml_pdc", "80"}};
+            const auto& it = map.find(attrs.at("endpoint.1.protocol").value);
+            if (it != map.cend()) {
+                attrs.emplace("endpoint.1.port", ExtAttrValue{it->second, false});
+            }
         }
 
         return std::move(attrs);
