@@ -4,6 +4,7 @@
 #include <fty_common_db_connection.h>
 #include <fty_log.h>
 #include <iostream>
+#include <map>
 
 namespace fty::db::asset::select {
 
@@ -94,6 +95,7 @@ static fty::Expected<std::string> assetExtSql(const Filter& filter, const Order&
 
         filterWhere = implode(wheres, " AND ");
     }
+
     std::string orderJoin;
     if (order) {
         orderJoin = R"(
@@ -569,6 +571,8 @@ Expected<Attributes> extAttributes(uint32_t elementId)
     }
 }
 
+// FIXME duplicate of asset/src/asset-db.cpp/selectExtAttributes()
+
 Expected<Attributes> extAttributes(Connection& conn, uint32_t elementId)
 {
     static const std::string sql = R"(
@@ -589,11 +593,20 @@ Expected<Attributes> extAttributes(Connection& conn, uint32_t elementId)
 
         for (const auto& row : result) {
             ExtAttrValue val;
-
             row.get("value", val.value);
             row.get("read_only", val.readOnly);
 
             attrs.emplace(row.get("keytag"), val);
+        }
+
+        // IPMPROG-4490: [resilience]
+        // If no endpoint.1 port defined, set default related to the protocol
+        if ((attrs.count("endpoint.1.port") == 0) && (attrs.count("endpoint.1.protocol") != 0)) {
+            const std::map<std::string, std::string> map{{"nut_powercom", "443"}, {"nut_snmp", "161"}, {"nut_xml_pdc", "80"}};
+            const auto& it = map.find(attrs.at("endpoint.1.protocol").value);
+            if (it != map.cend()) {
+                attrs.emplace("endpoint.1.port", ExtAttrValue{it->second, false});
+            }
         }
 
         return std::move(attrs);

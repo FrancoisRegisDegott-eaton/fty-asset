@@ -10,10 +10,15 @@ project(fty-asset
 find_package(fty-cmake PATHS ${CMAKE_BINARY_DIR}/fty-cmake)
 ##############################################################################################################
 
-
-##############################################################################################################
+# libfty-asset.so (CRUD asset management)
 add_subdirectory(lib)
-add_subdirectory(accessor)
+
+# libfty-asset-libng.so (CRUD asset management -new generation-)
 add_subdirectory(asset)
+
+# libfty-asset-accessor.so (client/server messenger)
+add_subdirectory(accessor)
+
+# fty-asset-server
 add_subdirectory(server)
-##############################################################################################################
+
