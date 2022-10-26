@@ -5,6 +5,7 @@
 #include <fty_common_agents.h>
 #include <fty_common_db_connection.h>
 #include <fty_common_mlm.h>
+#include <fty_log.h>
 #include <openssl/sha.h>
 #include <regex>
 #include <sstream>

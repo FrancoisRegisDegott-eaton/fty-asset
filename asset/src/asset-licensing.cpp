@@ -2,6 +2,7 @@
 #include <zmq.h>
 #include <fty_common_mlm_pool.h>
 #include <fty_proto.h>
+#include <fty_log.h>
 #include <fty/translate.h>
 #include <fty/expected.h>
 
