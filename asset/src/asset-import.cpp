@@ -716,7 +716,7 @@ AssetExpected<db::AssetElement> Import::processRow(
                     std::string assetJson = getJsonAsset(el.id);
                     if (auto res = activation::activate(assetJson); !res) {
                         logError("Error during asset activation - {}", res.error());
-                        return unexpected("licensing-err", res.error());
+                        return unexpected(res.error());
                     }
                 }
             } else {
@@ -776,7 +776,7 @@ AssetExpected<db::AssetElement> Import::processRow(
                     std::string assetJson = getJsonAsset(el.id);
                     if (auto res = activation::activate(assetJson); !res) {
                         logError("Error during asset activation - {}", res.error());
-                        return unexpected("licensing-err", res.error());
+                        return unexpected(res.error());
                     }
                 }
             } else {
