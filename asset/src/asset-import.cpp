@@ -177,7 +177,7 @@ AssetExpected<void> Import::process(bool checkLic)
         }
         else if (!limitations->global_configurability) {
             return unexpected(error(Errors::ActionForbidden)
-                   .format("Asset handling"_tr, "Licensing global_configurability limit hit"_tr));
+                   .format("Asset handling"_tr, "license has expired"_tr));
         }
     }
 
