@@ -31,7 +31,7 @@ inline Translate error(Errors err)
     case Errors::BadRequestDocument:
         return "Request document has invalid syntax. {}"_tr;
     case Errors::ActionForbidden:
-        return "{} is forbidden. {}"_tr;
+        return "{} is forbidden: {}"_tr;
     case Errors::ElementNotFound:
         return "Element '{}' not found."_tr;
     case Errors::ElementAlreadyExist:
