@@ -43,7 +43,9 @@ void createElementType(fty::db::Connection& conn)
                 (17, "plan"),
                 (18, "cops"),
                 (19, "operating-system"),
-                (20, "host-group");
+                (20, "host-group"),
+                (21, "container-cluster"),
+                (22, "container-node");
     )");
 }
 

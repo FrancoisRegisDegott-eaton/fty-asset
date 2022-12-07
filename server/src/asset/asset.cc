@@ -231,12 +231,7 @@ bool AssetImpl::hasLogicalAsset() const
 
 bool AssetImpl::isVirtual() const
 {
-
-    return ((getAssetType() == TYPE_INFRA_SERVICE) || (getAssetType() == TYPE_CLUSTER) || (getAssetType() == TYPE_HYPERVISOR) ||
-            (getAssetType() == TYPE_VIRTUAL_MACHINE) || (getAssetType() == TYPE_STORAGE_SERVICE) ||
-            (getAssetType() == TYPE_VAPP) || (getAssetType() == TYPE_CONNECTOR) ||
-            (getAssetType() == TYPE_SERVER) || (getAssetType() == TYPE_PLANNER) ||
-            (getAssetType() == TYPE_OPERATING_SYSTEM) || (getAssetType() == TYPE_PLAN));
+    return persist::is_virtual(getAssetType());
 }
 
 bool AssetImpl::hasLinkedAssets() const
