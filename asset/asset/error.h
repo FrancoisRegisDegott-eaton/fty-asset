@@ -29,7 +29,7 @@ inline Translate error(Errors err)
     case Errors::ParamRequired:
         return "Parameter '{}' is required."_tr;
     case Errors::BadRequestDocument:
-        return "Request document has invalid syntax. {}"_tr;
+        return "Request document has invalid '{}' syntax."_tr;
     case Errors::ActionForbidden:
         return "{} is forbidden: {}"_tr;
     case Errors::ElementNotFound:

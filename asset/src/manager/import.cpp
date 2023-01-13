@@ -71,14 +71,20 @@ AssetExpected<AssetManager::ImportList> AssetManager::importCsv(
         return strOut;
     };
 
-    // decode iso_8859_1 to utf8 (éàè)... more?
-    std::stringstream ss(sanitize(iso_8859_1_to_utf8(csvStr)));
+    CsvMap csv;
+    try {
+        // decode iso_8859_1 to utf8 (éàè)... more?
+        std::stringstream ss(sanitize(iso_8859_1_to_utf8(csvStr)));
 
-    CsvMap csv = CsvMap_from_istream(ss);
-
-    csv.setCreateMode(CREATE_MODE_CSV);
-    csv.setCreateUser(user);
-    csv.setUpdateUser(user);
+        // parse csv
+        csv = CsvMap_from_istream(ss);
+        csv.setCreateMode(CREATE_MODE_CSV);
+        csv.setCreateUser(user);
+        csv.setUpdateUser(user);
+    }
+    catch (...) {
+        return unexpected(error(fty::asset::Errors::BadRequestDocument).format("csv"));
+    }
 
     Import import(csv);
     if (auto ret = import.process(sendNotify)) {
